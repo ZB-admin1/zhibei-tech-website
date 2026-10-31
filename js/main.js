@@ -273,4 +273,291 @@
 
   // -------- Init --------
   checkAPI();
+
+  // ============================================================
+  // ZBpay Extension
+  // ============================================================
+  const LS_AUTH = 'zb_auth_token';
+  const LS_USER = 'zb_auth_user';
+  let currentAuth = null;
+
+  // --- Utils ---
+  function getToken() { return localStorage.getItem(LS_AUTH); }
+  function setToken(t) { if (t) { localStorage.setItem(LS_AUTH, t); } else { localStorage.removeItem(LS_AUTH); } }
+  function getUser() {
+    try { return JSON.parse(localStorage.getItem(LS_USER) || 'null'); } catch { return null; }
+  }
+  function setUser(u) { if (u) { localStorage.setItem(LS_USER, JSON.stringify(u)); } else { localStorage.removeItem(LS_USER); } }
+  function fmtQuota(n) {
+    n = Number(n) || 0;
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+    return n.toString();
+  }
+  function toast(msg, type='info') {
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 2800);
+  }
+  async function apiFetch(path, opts={}) {
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers||{}) };
+    const token = getToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const r = await fetch(path, { ...opts, headers });
+    const ct = r.headers.get('content-type') || '';
+    const data = ct.includes('json') ? await r.json() : await r.text();
+    if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    return data;
+  }
+
+  // --- Auth UI ---
+  function refreshNav() {
+    const u = getUser();
+    currentAuth = u;
+    const guest = document.getElementById('navGuest');
+    const user = document.getElementById('navUser');
+    const quota = document.getElementById('navQuota');
+    if (u) {
+      if (guest) guest.style.display = 'none';
+      if (user) user.style.display = '';
+      if (quota) quota.textContent = fmtQuota(u.quota_tokens) + ' Tokens';
+      // refresh from server
+      apiFetch('/api/me').then(me => {
+        setUser(me);
+        if (quota) quota.textContent = fmtQuota(me.quota_tokens) + ' Tokens';
+      }).catch(()=>{});
+    } else {
+      if (guest) guest.style.display = '';
+      if (user) user.style.display = 'none';
+    }
+  }
+  window.doLogout = function() {
+    setToken(null); setUser(null); refreshNav(); toast('已退出登录', 'info');
+  };
+  window.openAuth = function(mode) { showAuthModal(mode); };
+
+  function showAuthModal(mode) {
+    closeModal();
+    const root = document.getElementById('modalRoot');
+    const title = mode === 'login' ? '欢迎回来' : '注册新账户';
+    const sub = mode === 'login' ? '登录后即可购买 Token 额度' : '注册即送 100,000 Tokens 免费额度';
+    const body = `
+      <div class="modal-mask" onclick="if(event.target===this) closeModal()">
+        <div class="modal">
+          <button class="modal-close" onclick="closeModal()">✕</button>
+          <h3>${mode === 'login' ? '🔐 ' : '✨ '}${title}</h3>
+          <p class="modal-sub">${sub}</p>
+          ${mode === 'register' ? `
+          <div class="form-group"><label>邮箱 (可选)</label><input id="authEmail" type="email" placeholder="you@company.com"></div>` : ''}
+          <div class="form-group"><label>用户名</label><input id="authUser" type="text" placeholder="your_username" autocomplete="username"></div>
+          <div class="form-group"><label>密码</label><input id="authPass" type="password" placeholder="至少 6 位" autocomplete="current-password"></div>
+          <button class="btn btn-primary btn-full" onclick="doAuth('${mode}')">
+            ${mode === 'login' ? '登 录' : '注 册'}
+          </button>
+          <div class="switch-auth">
+            ${mode === 'login' ? '没有账号？' : '已有账号？'}
+            <a onclick="showAuthModal('${mode === 'login' ? 'register' : 'login'}')">
+              ${mode === 'login' ? '立即注册 →' : '立即登录 →'}
+            </a>
+          </div>
+        </div>
+      </div>`;
+    root.innerHTML = body;
+    setTimeout(() => document.getElementById('authUser')?.focus(), 50);
+  }
+  window.doAuth = async function(mode) {
+    const user = document.getElementById('authUser').value.trim();
+    const pass = document.getElementById('authPass').value;
+    const email = document.getElementById('authEmail')?.value.trim() || '';
+    if (!user || !pass) { toast('请输入用户名和密码', 'error'); return; }
+    try {
+      const url = mode === 'login' ? '/api/login' : '/api/register';
+      const body = mode === 'login' ? { username: user, password: pass } : { username: user, password: pass, email };
+      const data = await apiFetch(url, { method: 'POST', body: JSON.stringify(body) });
+      setToken(data.token); setUser(data); refreshNav(); closeModal();
+      toast(mode === 'login' ? `欢迎回来，${data.username}！` : `注册成功！免费额度 ${fmtQuota(data.quota_tokens)} Tokens`, 'success');
+    } catch(e) { toast(e.message, 'error'); }
+  };
+  window.closeModal = function() {
+    const m = document.getElementById('modalRoot'); if (m) m.innerHTML = '';
+  };
+
+  // --- Pricing + Payment Flow ---
+  let pricingProducts = [];
+  function tierOf(id) {
+    if (id.startsWith('dev_')) return 'dev';
+    if (id.startsWith('pro_')) return 'pro';
+    if (id.startsWith('enterprise_')) return 'enterprise';
+    return 'all';
+  }
+  function loadPricing() {
+    apiFetch('/api/pay/pricing').then(data => {
+      pricingProducts = data.products;
+      renderPricingGrid('all');
+      document.querySelectorAll('.pay-tab').forEach(t => {
+        t.addEventListener('click', () => {
+          document.querySelectorAll('.pay-tab').forEach(x => x.classList.remove('active'));
+          t.classList.add('active');
+          renderPricingGrid(t.dataset.tier);
+        });
+      });
+    }).catch(err => toast('加载定价失败: ' + err.message, 'error'));
+  }
+  function renderPricingGrid(tier) {
+    const grid = document.getElementById('pricingGrid'); if (!grid) return;
+    const tagClass = { '免费': 'tag-free', '热门': 'tag-hot', '推荐': 'tag-rec', '企业': 'tag-ent' };
+    grid.innerHTML = pricingProducts.map(p => {
+      const amount = p.amount === 0 ? '免费' : ('¥' + p.amount);
+      const period = p.interval === 'monthly' ? '/ 月' : '/ 年';
+      const hidden = (tier !== 'all' && tierOf(p.id) !== tier) ? 'hidden' : '';
+      return `
+        <div class="price-card reveal" ${hidden}>
+          ${p.tag ? `<span class="price-badge-tag ${tagClass[p.tag] || 'tag-hot'}">${p.tag}</span>` : ''}
+          <div class="price-name">${p.name}</div>
+          <div class="price-num"><span class="price-symbol">${p.amount === 0 ? '' : '¥'}</span>${p.amount === 0 ? '免费' : (p.amount < 100 ? p.amount : p.amount)}</div>
+          <div class="price-period">${p.amount === 0 ? '' : period}</div>
+          <ul class="price-features">
+            <li>🎁 ${fmtQuota(p.quota_tokens)} Tokens 额度</li>
+            <li>✅ 全部模型可用</li>
+            <li>⚡ 专属 API Key</li>
+            <li>🔑 随时升级或退款</li>
+          </ul>
+          <button class="btn ${p.amount === 0 ? 'btn-outline' : 'btn-primary'} pay-now-btn" onclick="openPay('${p.id}')">
+            ${p.amount === 0 ? '免费激活' : '立即支付'}
+          </button>
+        </div>`;
+    }).join('');
+  }
+
+  window.openPay = function(pid) {
+    const p = pricingProducts.find(x => x.id === pid);
+    if (!p) return;
+    if (!getToken()) { toast('请先登录或注册', 'info'); showAuthModal('login'); return; }
+    showPayModal(p, 1);
+  };
+  function showPayModal(product, step, orderId) {
+    closeModal();
+    const root = document.getElementById('modalRoot');
+    const amountText = product.amount === 0 ? '免费' : ('¥' + product.amount);
+    let stepsHtml = '';
+    if (step >= 1) {
+      const step1 = step === 1 ? 'active' : 'done';
+      const step2 = step >= 2 ? (step === 2 ? 'active' : 'done') : '';
+      const step3 = step >= 3 ? 'active' : '';
+      stepsHtml = `
+        <div class="pay-step done"><div class="step-num">✓</div> 选择套餐</div>
+        <div class="pay-step ${step === 2 ? 'active' : ''}"><div class="step-num">${step >= 3 ? '✓' : '2'}</div> 确认订单</div>
+        <div class="pay-step ${step === 3 ? 'active' : ''}"><div class="step-num">3</div> 完成支付</div>`;
+    }
+
+    let contentHtml = '';
+    if (step === 2) {
+      contentHtml = `
+        <div class="pay-mock-box">
+          <div class="qr-icon">📱</div>
+          <p>扫码支付 <strong>${amountText}</strong> 或点击下方按钮模拟支付</p>
+          <button class="btn btn-primary btn-full" onclick="mockPay('${orderId}')">🅰️ 模拟支付成功（ZBpay Demo）</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);text-align:center">此为演示环境 · 不会实际扣款 · 真实接入需对接支付宝/微信支付</p>`;
+    } else if (step === 3) {
+      contentHtml = `
+        <div class="pay-success-box">
+          <div class="check-icon">✓</div>
+          <h4>支付成功！</h4>
+          <p>${fmtQuota(product.quota_tokens)} Tokens 已到账</p>
+        </div>`;
+    }
+
+    const body = `
+      <div class="modal-mask" onclick="if(event.target===this) closeModal()">
+        <div class="modal">
+          <button class="modal-close" onclick="closeModal()">✕</button>
+          <h3>💳 ZBpay 支付</h3>
+          <p class="modal-sub">${product.name}</p>
+
+          <div class="pay-product-summary">
+            <div class="pps-name">${product.name}</div>
+            <div class="pps-quota">🎁 到账额度 ${fmtQuota(product.quota_tokens)} Tokens</div>
+            <div class="pps-amount">${product.amount === 0 ? '免费' : ('¥' + product.amount)}${product.amount === 0 ? '' : '<small>.00</small>'}</div>
+          </div>
+
+          ${step > 1 ? stepsHtml : ''}
+          ${contentHtml}
+
+          ${step === 1 ? `<button class="btn btn-primary btn-full" onclick="createOrder('${product.id}')">确认并创建订单 →</button>` : ''}
+          ${step === 3 ? `<button class="btn btn-primary btn-full" onclick="closeModal();refreshNav();toast('额度已更新！','success')">完成，查看我的配额</button>` : ''}
+        </div>
+      </div>`;
+    root.innerHTML = body;
+  }
+  window.createOrder = async function(pid) {
+    const p = pricingProducts.find(x => x.id === pid);
+    const loadingToast = toast('正在创建订单...', 'info');
+    try {
+      const data = await apiFetch('/api/pay/orders', { method: 'POST', body: JSON.stringify({ product: pid }) });
+      showPayModal(p, 2, data.order_id);
+      toast(`订单已创建 ${data.order_id}`, 'info');
+    } catch(e) { toast('下单失败: ' + e.message, 'error'); }
+  };
+  window.mockPay = async function(oid) {
+    try {
+      const data = await apiFetch('/api/pay/mock-pay', { method: 'POST', body: JSON.stringify({ order_id: oid }) });
+      const p = pricingProducts.find(x => true); // we don't know which product - fetch order
+      const orderData = await apiFetch('/api/pay/orders/' + oid);
+      const pinfo = { name: orderData.product_name, quota_tokens: orderData.quota_tokens, amount: orderData.amount };
+      setUser({ ...getUser(), quota_tokens: (getUser()?.quota_tokens || 0) + data.quota_credited });
+      showPayModal(pinfo, 3);
+      refreshNav();
+    } catch(e) { toast('支付失败: ' + e.message, 'error'); }
+  };
+
+  // --- Orders ---
+  window.openOrders = async function() {
+    if (!getToken()) { showAuthModal('login'); return; }
+    try {
+      const data = await apiFetch('/api/pay/orders');
+      showOrdersModal(data.orders || []);
+    } catch(e) { toast(e.message, 'error'); }
+  };
+  function showOrdersModal(orders) {
+    closeModal();
+    const root = document.getElementById('modalRoot');
+    const statusClass = { pending: 'status-pending', paid: 'status-paid', refunded: 'status-refunded', failed: 'status-failed' };
+    const statusText = { pending: '待支付', paid: '已支付', refunded: '已退款', failed: '失败' };
+    const rows = orders.length === 0
+      ? '<div class="order-empty">暂无订单 · 去 <a href="#pricing" style="color:var(--accent-cyan);text-decoration:underline">定价区</a> 购买 Token 吧</div>'
+      : orders.map(o => `
+        <div class="order-row">
+          <div>
+            <div class="o-product">${o.product_name}</div>
+            <div class="o-id">${o.order_id}</div>
+          </div>
+          <div class="o-amount">¥${o.amount}</div>
+          <span class="o-status ${statusClass[o.status] || 'status-failed'}">${statusText[o.status] || o.status}</span>
+          ${o.status === 'paid' ? `<button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="doRefund('${o.order_id}')">退款</button>` : ''}
+        </div>`).join('');
+    root.innerHTML = `
+      <div class="modal-mask" onclick="if(event.target===this) closeModal()">
+        <div class="modal modal-lg">
+          <button class="modal-close" onclick="closeModal()">✕</button>
+          <h3>📋 我的订单</h3>
+          <p class="modal-sub">共 ${orders.length} 个订单</p>
+          <div class="orders-list">${rows}</div>
+        </div>
+      </div>`;
+  }
+  window.doRefund = async function(oid) {
+    if (!confirm('确定要退款吗？对应的 Token 额度将被扣除。')) return;
+    try {
+      await apiFetch('/api/pay/orders/' + oid + '/refund', { method: 'POST' });
+      toast('退款成功！', 'success');
+      refreshNav(); openOrders();
+    } catch(e) { toast(e.message, 'error'); }
+  };
+
+  // Boot
+  refreshNav();
+  loadPricing();
 })();

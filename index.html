@@ -28,7 +28,18 @@
     </ul>
     <div class="nav-actions">
       <a href="api-docs.html" class="nav-link-btn">API 文档</a>
-      <a href="#contact" class="nav-cta">免费试用</a>
+      <a href="#pricing" class="nav-link-btn">ZBpay 充值</a>
+      <!-- Guest state -->
+      <span id="navGuest">
+        <button class="nav-link-btn" onclick="openAuth('login')">登录</button>
+        <button class="nav-cta" onclick="openAuth('register')">免费注册</button>
+      </span>
+      <!-- Logged in state -->
+      <span id="navUser" style="display:none">
+        <span class="nav-quota" title="当前剩余额度">💰 <span id="navQuota">-</span></span>
+        <button class="nav-link-btn" onclick="openOrders()">我的订单</button>
+        <button class="nav-cta" onclick="doLogout()">退出</button>
+      </span>
     </div>
   </div>
 </nav>
@@ -336,57 +347,29 @@ res = requests.<span class="code-function">post</span>(<span class="code-string"
   </div>
 </section>
 
-<!-- Pricing -->
+<!-- Pricing (ZBpay) -->
 <section class="section" id="pricing">
   <div class="section-inner">
     <div class="section-header reveal">
-      <span class="section-label">Pricing</span>
-      <h2 class="section-title">灵活透明的定价</h2>
-      <p class="section-desc">按量付费，无隐藏费用。新用户免费额度 100,000 Tokens</p>
+      <span class="section-label">Pricing · ZBpay</span>
+      <h2 class="section-title">灵活透明的 Token 定价</h2>
+      <p class="section-desc">按量付费 · 1 元 ≈ 1,000,000 Tokens · 新用户注册即送 100,000 Tokens 免费额度</p>
     </div>
 
-    <div class="pricing-grid">
-      <div class="price-card reveal">
-        <div class="price-name">开发者版</div>
-        <div class="price-num"><span class="price-symbol">¥</span>0</div>
-        <div class="price-period">/ 月</div>
-        <ul class="price-features">
-          <li>每月 100K Tokens 免费</li>
-          <li>全部 3 款模型可用</li>
-          <li>社区技术支持</li>
-          <li>API 限流 10 req/min</li>
-        </ul>
-        <a href="#contact" class="btn btn-outline">免费开始</a>
-      </div>
+    <!-- Tiers -->
+    <div class="pay-tabs reveal">
+      <button class="pay-tab active" data-tier="all">全部</button>
+      <button class="pay-tab" data-tier="dev">开发者</button>
+      <button class="pay-tab" data-tier="pro">专业版</button>
+      <button class="pay-tab" data-tier="enterprise">企业版</button>
+    </div>
 
-      <div class="price-card reveal price-featured">
-        <div class="price-badge">最受欢迎</div>
-        <div class="price-name">企业标准版</div>
-        <div class="price-num"><span class="price-symbol">¥</span>999</div>
-        <div class="price-period">/ 月</div>
-        <ul class="price-features">
-          <li>5M Tokens 月度额度</li>
-          <li>全部模型 + 优先调度</li>
-          <li>7×24 在线技术支持</li>
-          <li>API 限流 100 req/s</li>
-          <li>专属 SLA 99.9%</li>
-        </ul>
-        <a href="#contact" class="btn btn-primary">立即订购</a>
-      </div>
+    <div class="pricing-grid" id="pricingGrid">
+      <!-- Cards injected by JS from /api/pay/pricing -->
+    </div>
 
-      <div class="price-card reveal">
-        <div class="price-name">私有化部署</div>
-        <div class="price-num"><span class="price-symbol">定制</span></div>
-        <div class="price-period"></div>
-        <ul class="price-features">
-          <li>模型本地化部署</li>
-          <li>完整代码授权</li>
-          <li>离线可用 · 数据不出域</li>
-          <li>专属技术团队</li>
-          <li>联合定制开发</li>
-        </ul>
-        <a href="#contact" class="btn btn-outline">联系销售</a>
-      </div>
+    <div class="pricing-note reveal">
+      <p>🔒 所有购买均通过 ZBpay 加密支付通道完成 · 支付成功后额度实时到账 · 支持随时退款</p>
     </div>
   </div>
 </section>
@@ -467,6 +450,9 @@ res = requests.<span class="code-function">post</span>(<span class="code-string"
     <p>© 2026 智北科技 ZhiBei Technology · 自研大模型 Powered · All rights reserved.</p>
   </div>
 </footer>
+
+<!-- ============ Modals ============ -->
+<div id="modalRoot"></div>
 
 <script src="js/main.js"></script>
 </body>

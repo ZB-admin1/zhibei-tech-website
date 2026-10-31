@@ -104,6 +104,7 @@
     <ul class="admin-nav">
       <li><a href="#" class="active" data-view="overview">📊 数据概览</a></li>
       <li><a href="#" data-view="users">👥 用户管理</a></li>
+      <li><a href="#" data-view="pay">💰 支付管理</a></li>
       <li><a href="#" data-view="models">🧠 模型调用</a></li>
       <li><a href="index.html">↩️ 返回官网</a></li>
     </ul>
@@ -168,6 +169,75 @@
         <div class="card">
           <div class="card-header"><div class="card-title">📈 模型调用详情</div></div>
           <div id="modelDetail" style="color:var(--text-muted);">加载中...</div>
+        </div>
+      </div>
+
+      <!-- ZBpay -->
+      <div id="view-pay" style="display:none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">总营收</div>
+            <div class="value" id="payTotalRevenue">¥0</div>
+            <div class="sub">累计</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">退款金额</div>
+            <div class="value" id="payRefundRev" style="color:#f87171;">¥0</div>
+            <div class="sub">累计</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">净营收</div>
+            <div class="value" id="payNetRevenue">¥0</div>
+            <div class="sub">累计</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">已支付订单</div>
+            <div class="value" id="payPaidCount">0</div>
+            <div class="sub">总计</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;margin-bottom:24px;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📦 产品营收</div>
+              <div id="payProductStats" style="font-size:12px;color:var(--text-muted);"></div>
+            </div>
+            <div id="payProductTable"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">⚡ 手动充值额度</div></div>
+            <div style="margin-bottom:12px;font-size:12px;color:var(--text-muted);">为用户增加 Token 额度（不涉及真实扣款）</div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">目标用户</label>
+              <input type="text" id="mcUser" placeholder="username" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-family:monospace;">
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Token 数量</label>
+              <input type="number" id="mcQuota" value="100000" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-family:monospace;">
+            </div>
+            <button onclick="manualCredit()" style="width:100%;padding:10px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;">确认充值</button>
+            <div id="mcResult" style="margin-top:10px;font-size:12px;color:var(--text-muted);"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📋 全部订单</div>
+            <select id="orderFilter" onchange="loadOrders()" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+              <option value="">全部状态</option>
+              <option value="pending">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="refunded">已退款</option>
+            </select>
+          </div>
+          <table>
+            <thead><tr>
+              <th>订单号</th><th>用户</th><th>商品</th><th>金额</th><th>额度</th><th>状态</th><th>时间</th>
+            </tr></thead>
+            <tbody id="orderTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">加载中...</td></tr></tbody>
+          </table>
         </div>
       </div>
     </main>
@@ -275,6 +345,73 @@
     });
   }
 
+  // --- ZBpay Admin ---
+  async function loadPay() {
+    try {
+      const rev = await api('/api/pay/admin/revenue');
+      document.getElementById('payTotalRevenue').textContent = '¥' + rev.total_revenue;
+      document.getElementById('payRefundRev').textContent = '¥' + rev.refunded_revenue;
+      document.getElementById('payNetRevenue').textContent = '¥' + rev.net_revenue;
+      document.getElementById('payPaidCount').textContent = rev.orders?.paid || 0;
+      // Product table
+      const byP = rev.by_product || [];
+      const pt = document.getElementById('payProductTable');
+      if (byP.length === 0) {
+        pt.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">暂无销售数据</div>';
+      } else {
+        pt.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+          '<thead><tr><th style="text-align:left;padding:10px;font-size:11px;color:var(--text-muted);">产品</th>' +
+          '<th style="text-align:right;padding:10px;font-size:11px;color:var(--text-muted);">订单数</th>' +
+          '<th style="text-align:right;padding:10px;font-size:11px;color:var(--text-muted);">收入</th>' +
+          '<th style="text-align:right;padding:10px;font-size:11px;color:var(--text-muted);">Tokens</th></tr></thead>' +
+          '<tbody>' + byP.map(p => `
+            <tr><td style="padding:10px;font-weight:600;">${p.product_id}</td>
+                <td style="padding:10px;text-align:right;color:var(--text-muted);">${p.count}</td>
+                <td style="padding:10px;text-align:right;color:var(--accent-cyan);font-weight:700;">¥${p.revenue}</td>
+                <td style="padding:10px;text-align:right;font-family:monospace;font-size:12px;">${p.quota.toLocaleString()}</td></tr>
+          `).join('') + '</tbody></table>';
+      }
+    } catch(e) { console.warn('pay revenue load failed', e); }
+    loadOrders();
+  }
+  async function loadOrders() {
+    try {
+      const filter = document.getElementById('orderFilter').value;
+      const url = '/api/pay/admin/all-orders' + (filter ? '?status=' + filter : '');
+      const data = await api(url);
+      const tbody = document.getElementById('orderTableBody');
+      const statusClass = { pending:'status-pending', paid:'status-paid', refunded:'status-refunded', failed:'status-failed' };
+      const statusText = { pending:'待支付', paid:'已支付', refunded:'已退款', failed:'失败' };
+      if (!data.orders || data.orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">暂无订单</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.orders.map(o => `
+        <tr>
+          <td style="font-family:monospace;font-size:11px;color:var(--text-muted);">${o.order_id}</td>
+          <td><strong>${o.username}</strong></td>
+          <td>${o.product_name}</td>
+          <td style="color:var(--accent-cyan);font-weight:700;">¥${o.amount}</td>
+          <td style="font-family:monospace;font-size:12px;">${(o.quota_tokens||0).toLocaleString()}</td>
+          <td><span class="o-status ${statusClass[o.status]||''}" style="padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;background:rgba(255,255,255,0.05);color:var(--text-muted);">${statusText[o.status]||o.status}</span></td>
+          <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${(o.created_at||'').slice(0,19).replace('T',' ')}</td>
+        </tr>
+      `).join('');
+    } catch(e) { console.warn('orders load failed', e); }
+  }
+  window.manualCredit = async function() {
+    const u = document.getElementById('mcUser').value.trim();
+    const q = parseInt(document.getElementById('mcQuota').value);
+    const r = document.getElementById('mcResult');
+    if (!u || !q) { r.style.color = '#ef4444'; r.textContent = '请填写用户和额度'; return; }
+    try {
+      const res = await api('/api/pay/admin/manual-credit', 'POST', { username:u, quota_tokens:q, note:'admin dashboard credit' });
+      r.style.color = '#4ade80'; r.textContent = `✓ 成功为 ${u} 充值 ${q.toLocaleString()} Tokens`;
+      document.getElementById('mcUser').value = ''; document.getElementById('mcQuota').value = '100000';
+      loadPay();
+    } catch(e) { r.style.color = '#ef4444'; r.textContent = '充值失败: ' + (e.message||''); }
+  };
+
   // Navigation
   document.querySelectorAll('.admin-nav a[data-view]').forEach(a => {
     a.onclick = (e) => {
@@ -282,11 +419,12 @@
       document.querySelectorAll('.admin-nav a').forEach(x => x.classList.remove('active'));
       a.classList.add('active');
       const v = a.dataset.view;
-      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', models:'🧠 模型调用'}[v];
-      ['overview','users','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
+      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', models:'🧠 模型调用'}[v];
+      ['overview','users','pay','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
       document.getElementById('view-'+v).style.display = '';
       if (v === 'users') loadUsers();
       if (v === 'overview') loadOverview();
+      if (v === 'pay') loadPay();
     };
   });
 

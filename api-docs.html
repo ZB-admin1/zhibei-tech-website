@@ -74,6 +74,17 @@
       <li><a href="#endpoint-code">POST /api/code</a></li>
       <li><a href="#endpoint-analyze">POST /api/analyze</a></li>
     </ul>
+    <h4>ZBpay 支付</h4>
+    <ul>
+      <li><a href="#pay-pricing">GET /api/pay/pricing</a></li>
+      <li><a href="#pay-create">POST /api/pay/orders</a></li>
+      <li><a href="#pay-list">GET /api/pay/orders</a></li>
+      <li><a href="#pay-mock">POST /api/pay/mock-pay</a></li>
+      <li><a href="#pay-refund">POST /api/pay/orders/{id}/refund</a></li>
+      <li><a href="#pay-recharge">GET /api/pay/recharge-log</a></li>
+      <li><a href="#pay-webhook">POST /api/pay/webhook</a></li>
+      <li><a href="#pay-admin">Admin 端点</a></li>
+    </ul>
     <h4>错误码</h4>
     <ul>
       <li><a href="#errors">错误码说明</a></li>
@@ -271,6 +282,66 @@ response = ai.<span class="fn">chat</span>(
       </tbody>
     </table>
 
+    <!-- ================= ZBpay ================= -->
+    <h2 id="zbpay">💳 ZBpay 支付系统</h2>
+    <p>智北科技提供完整的 Token 订阅充值系统，支持开发者免费额度、专业版/企业版按月按年订阅。</p>
+    <div class="note-block"><strong>💎 费率：</strong>1 元 ≈ 1,000,000 Tokens · 充值后额度实时到账 · 支持退款</div>
+
+    <h3 id="pay-pricing">GET /api/pay/pricing · 产品目录（公开）</h3>
+    <p>获取所有可购买产品。</p>
+    <div class="code-block"><div class="label">cURL</div><pre>curl -X GET http://localhost:8080/api/pay/pricing</pre></div>
+    <div class="code-block"><div class="label">Response (200)</div><pre>{
+  <span class="str">"products"</span>: [
+    { <span class="str">"id"</span>: <span class="str">"pro_yearly"</span>, <span class="str">"name"</span>: <span class="str">"Pro Annual"</span>, <span class="str">"amount"</span>: 999,
+      <span class="str">"quota_tokens"</span>: 12000000, <span class="str">"tag"</span>: <span class="str">"推荐"</span> }
+  ],
+  <span class="str">"yuan_per_1000_tokens"</span>: 0.001
+}</pre></div>
+
+    <h3 id="pay-create">POST /api/pay/orders · 创建订单（需认证）</h3>
+    <p>为当前用户创建一个待支付订单。</p>
+    <div class="code-block"><div class="label">cURL</div><pre>curl -X POST http://localhost:8080/api/pay/orders \
+  -H <span class="str">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"product":"pro_yearly"}'</span></pre></div>
+    <div class="code-block"><div class="label">Response (201)</div><pre>{
+  <span class="str">"order_id"</span>: <span class="str">"ord_12345678"</span>,
+  <span class="str">"product"</span>: { <span class="str">"id"</span>: <span class="str">"pro_yearly"</span>, <span class="str">"amount"</span>: 999, <span class="str">"quota"</span>: 12000000 },
+  <span class="str">"status"</span>: <span class="str">"pending"</span>,
+  <span class="str">"expires_at"</span>: <span class="str">"2026-10-31T09:18:07Z"</span>,
+  <span class="str">"checkout_url"</span>: <span class="str">"/api/pay/mock-pay?order_id=ord_12345678"</span>
+}</pre></div>
+
+    <h3 id="pay-list">GET /api/pay/orders · 我的订单（需认证）</h3>
+    <p>返回当前用户的全部订单记录。</p>
+
+    <h3 id="pay-mock">POST /api/pay/mock-pay · 模拟支付（Demo）</h3>
+    <p>演示用途。调用后订单状态变为 paid，对应额度自动到账。<strong>生产环境需对接支付宝/微信支付。</strong></p>
+    <div class="code-block"><div class="label">cURL</div><pre>curl -X POST http://localhost:8080/api/pay/mock-pay \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"order_id":"ord_12345678"}'</span></pre></div>
+
+    <h3 id="pay-refund">POST /api/pay/orders/{order_id}/refund · 退款</h3>
+    <p>仅对已支付订单可用。退款后 Token 额度相应扣除。</p>
+
+    <h3 id="pay-recharge">GET /api/pay/recharge-log · 充值记录</h3>
+    <p>返回当前用户所有充值/退款/管理员手动额度变动的流水记录。</p>
+
+    <h3 id="pay-webhook">POST /api/pay/webhook · 支付回调（公开）</h3>
+    <p>第三方支付平台回调端点。收到回调后自动将订单标记为已支付并增加额度。</p>
+    <div class="code-block"><div class="label">Payload</div><pre>{
+  <span class="str">"order_id"</span>: <span class="str">"ord_12345678"</span>,
+  <span class="str">"pay_method"</span>: <span class="str">"alipay"</span>
+}</pre></div>
+
+    <h3 id="pay-admin">🔐 Admin 端点（需管理员角色）</h3>
+    <ul>
+      <li><code>GET /api/pay/admin/all-orders</code> · 全部订单</li>
+      <li><code>GET /api/pay/admin/revenue</code> · 营收统计（总/净/退款/按产品）</li>
+      <li><code>POST /api/pay/admin/manual-credit</code> · 手动给用户增加额度 <code>{ username, quota_tokens, note }</code></li>
+    </ul>
+    <div class="note-block"><strong>📊 Admin Dashboard：</strong>访问 <code>/admin.html</code> → 登录 → 💰 支付管理 Tab 查看营收面板和订单列表</div>
+
     <div class="note-block" style="margin-top:40px;text-align:center;">
       <strong>需要帮助？</strong><br>
       联系我们的技术团队：<code>api@zhibeitech.com</code> · 或在官网开启在线客服
@@ -279,5 +350,3 @@ response = ai.<span class="fn">chat</span>(
 </div>
 
 <script src="js/main.js"></script>
-</body>
-</html>
