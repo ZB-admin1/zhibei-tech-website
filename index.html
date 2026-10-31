@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智北科技 · 智能驱动未来</title>
-  <meta name="description" content="智北科技 - 专注于人工智能与云计算的创新型科技企业">
+  <title>智北科技 · 自研 AI 大模型 · 企业级 API</title>
+  <meta name="description" content="智北科技 - 自研大模型 ZB-Large，提供企业级 AI API：对话、生成、代码、分析一站式能力">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 </head>
 <body>
 <div class="grid-bg"></div>
+
+<!-- Navbar -->
 <nav class="navbar" id="navbar">
   <div class="nav-inner">
     <a href="#" class="logo">
@@ -18,149 +20,454 @@
     </a>
     <ul class="nav-links">
       <li><a href="#home">首页</a></li>
-      <li><a href="#features">核心能力</a></li>
-      <li><a href="#products">产品方案</a></li>
-      <li><a href="#team">团队</a></li>
+      <li><a href="#ai">ZB AI</a></li>
+      <li><a href="#demo">在线体验</a></li>
+      <li><a href="#api">API</a></li>
+      <li><a href="#pricing">定价</a></li>
       <li><a href="#contact">联系我们</a></li>
     </ul>
-    <a href="#contact" class="nav-cta">立即咨询</a>
-  </div>
-</nav>
-<section class="hero" id="home">
-  <div class="hero-content">
-    <div class="hero-badge"><span class="dot"></span><span>新一代 AI 企业解决方案已上线</span></div>
-    <h1 class="hero-title">用 <span class="gradient-text">智能科技</span><br>驱动企业数字化未来</h1>
-    <p class="hero-subtitle">智北科技专注于人工智能、云计算与大数据领域，为全球企业提供领先的数字化转型解决方案，让每一家企业都能享受到 AI 带来的效率革命。</p>
-    <div class="hero-actions">
-      <a href="#products" class="btn btn-primary">了解产品 →</a>
-      <a href="#contact" class="btn btn-secondary">预约演示</a>
+    <div class="nav-actions">
+      <a href="api-docs.html" class="nav-link-btn">API 文档</a>
+      <a href="#contact" class="nav-cta">免费试用</a>
     </div>
   </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="home">
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span>智北自研大模型 ZB-Large-v1 正式发布</span>
+    </div>
+    <h1 class="hero-title">
+      <span class="gradient-text">企业级 AI</span> 触手可及<br>
+      <span class="hero-sub">自研大模型 · 开放 API · 毫秒级响应</span>
+    </h1>
+    <p class="hero-subtitle">
+      智北科技自研百亿参数大模型 ZB-Large，为企业提供对话、生成、代码、数据分析四大核心能力。
+      通过标准化 REST API 接入，3 行代码即可让您的应用拥有智能大脑。
+    </p>
+    <div class="hero-actions">
+      <a href="#demo" class="btn btn-primary">⚡ 在线体验 AI</a>
+      <a href="api-docs.html" class="btn btn-secondary">📚 查看 API 文档</a>
+      <a href="#pricing" class="btn btn-ghost">💰 定价方案</a>
+    </div>
+  </div>
+
+  <!-- Code Preview -->
   <div class="hero-visual">
     <div class="hero-card">
       <div class="code-window">
         <div class="code-header">
           <span class="red"></span><span class="yellow"></span><span class="green"></span>
+          <span class="code-title">quickstart.js</span>
         </div>
-        <div class="code-body"><pre><code><span class="code-comment">// 接入智北 AI 仅需 3 行代码</span>
+        <div class="code-body"><pre><code><span class="code-comment">// 3 行代码接入智北 AI</span>
 <span class="code-keyword">import</span> { <span class="code-function">ZhiBeiAI</span> } <span class="code-keyword">from</span> <span class="code-string">'@zhibeitech/sdk'</span>;
 
-<span class="code-keyword">const</span> ai = <span class="code-keyword">new</span> <span class="code-function">ZhiBeiAI</span>({ apiKey: <span class="code-string">'your-key'</span> });
+<span class="code-keyword">const</span> ai = <span class="code-keyword">new</span> <span class="code-function">ZhiBeiAI</span>({ apiKey: <span class="code-string">'zb-api-key'</span> });
 
-<span class="code-keyword">const</span> result = <span class="code-keyword">await</span> ai.<span class="code-function">generate</span>(<span class="code-string">'帮我分析这份报告'</span>);
-<span class="code-comment">// 智能分析完成</span></code></pre></div>
+<span class="code-comment">// AI 对话</span>
+<span class="code-keyword">const</span> { reply } = <span class="code-keyword">await</span> ai.<span class="code-function">chat</span>([
+  { role: <span class="code-string">'user'</span>, content: <span class="code-string">'写一个排序函数'</span> }
+]);
+<span class="code-comment">// → 0.18s · 高质量代码</span></code></pre></div>
+        <div class="code-footer">
+          <div class="stat"><span class="num">180ms</span><span class="lbl">平均响应</span></div>
+          <div class="stat"><span class="num">98.2%</span><span class="lbl">准确率</span></div>
+          <div class="stat"><span class="num">3.2B+</span><span class="lbl">日调用</span></div>
+          <div class="stat"><span class="num">99.9%</span><span class="lbl">可用性</span></div>
+        </div>
       </div>
     </div>
   </div>
 </section>
-<section class="section" id="features">
+
+<!-- AI Models -->
+<section class="section" id="ai">
   <div class="section-inner">
     <div class="section-header reveal">
-      <span class="section-label">Core Capabilities</span>
-      <h2 class="section-title">四大核心能力，重塑企业效率</h2>
-      <p class="section-desc">从数据到决策，从算法到应用，智北科技为您提供端到端的智能解决方案</p>
+      <span class="section-label">Our AI Models</span>
+      <h2 class="section-title">自研大模型家族，满足不同场景</h2>
+      <p class="section-desc">从旗舰级到轻量快速，3 款自研模型覆盖企业全部 AI 场景需求</p>
     </div>
-    <div class="features-grid">
-      <div class="feature-card reveal"><div class="feature-icon cyan">🧠</div><h3 class="feature-title">AI 智能引擎</h3><p class="feature-desc">自研大模型驱动，支持自然语言理解、图像识别、预测分析等多模态 AI 能力。</p></div>
-      <div class="feature-card reveal"><div class="feature-icon purple">☁️</div><h3 class="feature-title">云原生架构</h3><p class="feature-desc">弹性可扩展的云原生基础设施，支持公有云、私有云、混合云多种部署方式。</p></div>
-      <div class="feature-card reveal"><div class="feature-icon pink">📊</div><h3 class="feature-title">大数据分析</h3><p class="feature-desc">PB 级数据实时处理能力，内置 200+ 行业分析模型。</p></div>
-      <div class="feature-card reveal"><div class="feature-icon green">🔒</div><h3 class="feature-title">企业级安全</h3><p class="feature-desc">通过 ISO 27001、等保三级认证，端到端加密传输，私有化部署支持。</p></div>
-    </div>
-  </div>
-</section>
-<section class="section stats">
-  <div class="section-inner">
-    <div class="stats-grid">
-      <div class="stat-item reveal"><span class="stat-number" data-target="500">0</span><span class="stat-label">+ 企业客户</span></div>
-      <div class="stat-item reveal"><span class="stat-number" data-target="99.9">0</span><span class="stat-label">% 服务可用性</span></div>
-      <div class="stat-item reveal"><span class="stat-number" data-target="10">0</span><span class="stat-label">+ 行业覆盖</span></div>
-      <div class="stat-item reveal"><span class="stat-number" data-target="3">0</span><span class="stat-label">亿+ 日请求处理</span></div>
-    </div>
-  </div>
-</section>
-<section class="section" id="products">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <span class="section-label">Products & Solutions</span>
-      <h2 class="section-title">为各行业量身打造的产品方案</h2>
-      <p class="section-desc">无论是初创企业还是世界 500 强，都能找到适合自己的数字化路径</p>
-    </div>
-    <div class="product-showcase reveal">
-      <div class="product-content"><h3>智北 AI 智能助手</h3><p>基于自研百亿参数大模型打造的企业级 AI 助手，支持多轮对话、知识问答、内容生成、代码编写等场景。</p><ul class="product-features"><li>企业知识库训练与 RAG 检索增强</li><li>API / SDK / 私有化部署</li><li>50+ 行业场景模板</li><li>多模态能力覆盖</li></ul></div>
-      <div class="product-visual"><div class="visual-box"><div class="visual-icon">🤖</div></div></div>
-    </div>
-    <div class="product-showcase reverse reveal">
-      <div class="product-content"><h3>智北数据中台</h3><p>一站式数据采集、治理、分析、可视化平台，帮助企业打破数据孤岛。</p><ul class="product-features"><li>100+ 数据源一键接入</li><li>自动化数据治理与血缘追踪</li><li>拖拽式 BI 报表</li><li>AI 驱动智能洞察</li></ul></div>
-      <div class="product-visual"><div class="visual-box"><div class="visual-icon">📈</div></div></div>
-    </div>
-    <div class="product-showcase reveal">
-      <div class="product-content"><h3>智北云原生平台</h3><p>面向现代应用的容器化部署与运维平台，提供微服务治理、DevOps 流水线等全链路能力。</p><ul class="product-features"><li>Kubernetes 一键部署</li><li>全链路可观测</li><li>智能弹性伸缩</li><li>多云统一管理</li></ul></div>
-      <div class="product-visual"><div class="visual-box"><div class="visual-icon">🚀</div></div></div>
-    </div>
-  </div>
-</section>
-<section class="section" id="team">
-  <div class="section-inner">
-    <div class="section-header reveal">
-      <span class="section-label">Our Team</span>
-      <h2 class="section-title">来自顶尖科技公司的专家团队</h2>
-      <p class="section-desc">核心成员毕业于清华、北大、MIT，曾任职于字节、阿里、谷歌等一线科技企业</p>
-    </div>
-    <div class="team-grid">
-      <div class="team-card reveal"><div class="team-avatar">李</div><h3 class="team-name">李明远</h3><p class="team-role">创始人 & CEO</p><p class="team-desc">前字节跳动 AI 实验室高级研究员，MIT 计算机博士</p></div>
-      <div class="team-card reveal"><div class="team-avatar">王</div><h3 class="team-name">王晓峰</h3><p class="team-role">CTO</p><p class="team-desc">前阿里云资深架构师，10 年分布式系统经验</p></div>
-      <div class="team-card reveal"><div class="team-avatar">张</div><h3 class="team-name">张思远</h3><p class="team-role">AI 首席科学家</p><p class="team-desc">北大人工智能实验室教授，国家重点研发计划首席科学家</p></div>
-      <div class="team-card reveal"><div class="team-avatar">陈</div><h3 class="team-name">陈雨桐</h3><p class="team-role">产品 VP</p><p class="team-desc">前腾讯高级产品总监</p></div>
-    </div>
-  </div>
-</section>
-<section class="cta-section">
-  <div class="section-inner">
-    <div class="cta-box reveal">
-      <h2 class="cta-title">准备好开启智能化转型了吗？</h2>
-      <p class="cta-desc">让智北科技的专家团队为您量身定制数字化方案，助力企业迈入智能时代</p>
-      <div class="hero-actions">
-        <a href="#contact" class="btn btn-primary">免费咨询 →</a>
-        <a href="#" class="btn btn-secondary">查看客户案例</a>
+
+    <div class="models-grid">
+      <div class="model-card reveal model-featured">
+        <div class="model-badge">推荐</div>
+        <div class="model-icon large">🧠</div>
+        <h3 class="model-name">ZB-Large <span class="model-ver">v1</span></h3>
+        <p class="model-desc">旗舰级大模型，理解与生成能力最强，支持 8K 上下文</p>
+        <div class="model-meta">
+          <div><span class="meta-k">参数量</span><span class="meta-v">10B+</span></div>
+          <div><span class="meta-k">上下文</span><span class="meta-v">8192</span></div>
+          <div><span class="meta-k">速度</span><span class="meta-v">180ms</span></div>
+        </div>
+        <div class="model-capabilities">
+          <span class="cap">对话</span><span class="cap">生成</span><span class="cap">代码</span><span class="cap">分析</span>
+        </div>
+      </div>
+
+      <div class="model-card reveal">
+        <div class="model-icon">⚡</div>
+        <h3 class="model-name">ZB-Turbo <span class="model-ver">v1</span></h3>
+        <p class="model-desc">轻量快速，毫秒级响应，适合实时对话场景</p>
+        <div class="model-meta">
+          <div><span class="meta-k">参数量</span><span class="meta-v">3B</span></div>
+          <div><span class="meta-k">上下文</span><span class="meta-v">4096</span></div>
+          <div><span class="meta-k">速度</span><span class="meta-v">60ms</span></div>
+        </div>
+        <div class="model-capabilities">
+          <span class="cap">对话</span><span class="cap">生成</span>
+        </div>
+      </div>
+
+      <div class="model-card reveal">
+        <div class="model-icon">💻</div>
+        <h3 class="model-name">ZB-Code <span class="model-ver">v1</span></h3>
+        <p class="model-desc">专注代码生成与调试的专用模型，支持 16K 上下文</p>
+        <div class="model-meta">
+          <div><span class="meta-k">参数量</span><span class="meta-v">7B</span></div>
+          <div><span class="meta-k">上下文</span><span class="meta-v">16384</span></div>
+          <div><span class="meta-k">速度</span><span class="meta-v">120ms</span></div>
+        </div>
+        <div class="model-capabilities">
+          <span class="cap">代码</span><span class="cap">对话</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
+
+<!-- Capabilities -->
+<section class="section stats-band">
+  <div class="section-inner">
+    <div class="cap-grid">
+      <div class="cap-item reveal">
+        <div class="cap-icon cyan">💬</div>
+        <div class="cap-info">
+          <h4>智能对话</h4>
+          <p>多轮上下文 · 意图理解 · 情感识别</p>
+        </div>
+      </div>
+      <div class="cap-item reveal">
+        <div class="cap-icon purple">✍️</div>
+        <div class="cap-info">
+          <h4>文本生成</h4>
+          <p>文章撰写 · 摘要翻译 · 创意写作</p>
+        </div>
+      </div>
+      <div class="cap-item reveal">
+        <div class="cap-icon pink">💻</div>
+        <div class="cap-info">
+          <h4>代码助手</h4>
+          <p>生成调试 · SQL 编写 · 多语言支持</p>
+        </div>
+      </div>
+      <div class="cap-item reveal">
+        <div class="cap-icon green">📊</div>
+        <div class="cap-info">
+          <h4>数据分析</h4>
+          <p>趋势预测 · 异常检测 · 自动洞察</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI Demo (Interactive) -->
+<section class="section" id="demo">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="section-label">Try It Now</span>
+      <h2 class="section-title">在线体验智北 AI</h2>
+      <p class="section-desc">直接在浏览器中与智北 AI 对话，无需 API Key（演示环境）</p>
+    </div>
+
+    <div class="demo-container reveal">
+      <div class="demo-chat" id="chatDemo">
+        <div class="chat-header">
+          <div class="chat-info">
+            <div class="chat-avatar">🤖</div>
+            <div>
+              <div class="chat-name">智北 AI 助手 ZB-01</div>
+              <div class="chat-status"><span class="dot"></span> 在线 · ZB-Large-v1</div>
+            </div>
+          </div>
+          <div class="chat-clear" id="clearChat">清空对话</div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg msg-ai">
+            <div class="msg-avatar">🤖</div>
+            <div class="msg-bubble">
+              您好！我是智北 AI 助手。试试这些问题：
+              <div class="suggestions">
+                <button class="suggestion" data-q="你是谁，介绍一下自己？">你是谁，介绍一下自己？</button>
+                <button class="suggestion" data-q="帮我写一个 Python 排序函数">写一个 Python 排序函数</button>
+                <button class="suggestion" data-q="帮我写一篇关于 AI 的短文">写一篇关于 AI 的短文</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="model-select">
+            <select id="modelSelect">
+              <option value="zb-large-v1">ZB-Large</option>
+              <option value="zb-turbo-v1">ZB-Turbo</option>
+              <option value="zb-code-v1">ZB-Code</option>
+            </select>
+          </div>
+          <textarea id="chatInput" placeholder="输入您的问题... (支持 Shift+Enter 换行)" rows="1"></textarea>
+          <button class="send-btn" id="sendBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="demo-sidebar">
+        <div class="api-curl reveal">
+          <h4>⚡ 对应的 API 调用</h4>
+          <div class="curl-block">
+            <div class="curl-tabs">
+              <button class="curl-tab active" data-tab="curl">cURL</button>
+              <button class="curl-tab" data-tab="js">JavaScript</button>
+              <button class="curl-tab" data-tab="py">Python</button>
+            </div>
+            <div class="curl-content" id="curlCurl">
+<span class="cmd">$</span> curl -X POST http://localhost:8080/api/chat \<br>
+  -H "Content-Type: application/json" \<br>
+  -d '{"model": "zb-large-v1",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"message": "你好"}'
+            </div>
+            <div class="curl-content hidden" id="curlJs">
+<span class="code-keyword">const</span> res = <span class="code-keyword">await</span> fetch(<span class="code-string">'/api/chat'</span>, {<br>
+  method: <span class="code-string">'POST'</span>,<br>
+  headers: { <span class="code-string">'Content-Type'</span>: <span class="code-string">'application/json'</span> },<br>
+  body: JSON.stringify({<br>
+    model: <span class="code-string">'zb-large-v1'</span>,<br>
+    message: <span class="code-string">'你好'</span><br>
+  })<br>
+});<br>
+<span class="code-keyword">const</span> { reply } = <span class="code-keyword">await</span> res.<span class="code-function">json</span>();
+            </div>
+            <div class="curl-content hidden" id="curlPy">
+<span class="code-keyword">import</span> requests<br><br>
+res = requests.<span class="code-function">post</span>(<span class="code-string">'http://localhost:8080/api/chat'</span>, json={<br>
+    <span class="code-string">'model'</span>: <span class="code-string">'zb-large-v1'</span>,<br>
+    <span class="code-string">'message'</span>: <span class="code-string">'你好'</span><br>
+})<br>
+<span class="code-keyword">print</span>(res.json()[<span class="code-string">'reply'</span>])
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-info reveal">
+          <h4>📊 实时统计</h4>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <div class="stat-value" id="statLatency">-- ms</div>
+              <div class="stat-label">响应时间</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="statTokens">--</div>
+              <div class="stat-label">Token 数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="statModel">ZB-Large</div>
+              <div class="stat-label">当前模型</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="statStatus">🟢 正常</div>
+              <div class="stat-label">API 状态</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- API Section -->
+<section class="section" id="api">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="section-label">API Platform</span>
+      <h2 class="section-title">简单、稳定、高性能的 API</h2>
+      <p class="section-desc">RESTful 设计 · 全语言 SDK · 自动扩缩容 · 99.9% SLA</p>
+    </div>
+
+    <div class="api-endpoints reveal">
+      <div class="endpoint">
+        <div class="method method-get">GET</div>
+        <div class="path">/api/health</div>
+        <div class="desc">健康检查</div>
+      </div>
+      <div class="endpoint">
+        <div class="method method-get">GET</div>
+        <div class="path">/api/models</div>
+        <div class="desc">获取可用模型列表</div>
+      </div>
+      <div class="endpoint">
+        <div class="method method-post">POST</div>
+        <div class="path">/api/chat</div>
+        <div class="desc">AI 对话（多轮）</div>
+      </div>
+      <div class="endpoint">
+        <div class="method method-post">POST</div>
+        <div class="path">/api/generate</div>
+        <div class="desc">文本生成</div>
+      </div>
+      <div class="endpoint">
+        <div class="method method-post">POST</div>
+        <div class="path">/api/code</div>
+        <div class="desc">代码助手</div>
+      </div>
+      <div class="endpoint">
+        <div class="method method-post">POST</div>
+        <div class="path">/api/analyze</div>
+        <div class="desc">数据分析</div>
+      </div>
+    </div>
+
+    <div class="cta-row reveal">
+      <a href="api-docs.html" class="btn btn-primary">📚 查看完整 API 文档</a>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="section" id="pricing">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="section-label">Pricing</span>
+      <h2 class="section-title">灵活透明的定价</h2>
+      <p class="section-desc">按量付费，无隐藏费用。新用户免费额度 100,000 Tokens</p>
+    </div>
+
+    <div class="pricing-grid">
+      <div class="price-card reveal">
+        <div class="price-name">开发者版</div>
+        <div class="price-num"><span class="price-symbol">¥</span>0</div>
+        <div class="price-period">/ 月</div>
+        <ul class="price-features">
+          <li>每月 100K Tokens 免费</li>
+          <li>全部 3 款模型可用</li>
+          <li>社区技术支持</li>
+          <li>API 限流 10 req/min</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline">免费开始</a>
+      </div>
+
+      <div class="price-card reveal price-featured">
+        <div class="price-badge">最受欢迎</div>
+        <div class="price-name">企业标准版</div>
+        <div class="price-num"><span class="price-symbol">¥</span>999</div>
+        <div class="price-period">/ 月</div>
+        <ul class="price-features">
+          <li>5M Tokens 月度额度</li>
+          <li>全部模型 + 优先调度</li>
+          <li>7×24 在线技术支持</li>
+          <li>API 限流 100 req/s</li>
+          <li>专属 SLA 99.9%</li>
+        </ul>
+        <a href="#contact" class="btn btn-primary">立即订购</a>
+      </div>
+
+      <div class="price-card reveal">
+        <div class="price-name">私有化部署</div>
+        <div class="price-num"><span class="price-symbol">定制</span></div>
+        <div class="price-period"></div>
+        <ul class="price-features">
+          <li>模型本地化部署</li>
+          <li>完整代码授权</li>
+          <li>离线可用 · 数据不出域</li>
+          <li>专属技术团队</li>
+          <li>联合定制开发</li>
+        </ul>
+        <a href="#contact" class="btn btn-outline">联系销售</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Contact -->
 <section class="section contact-section" id="contact">
   <div class="section-inner">
     <div class="contact-grid">
       <div class="contact-info reveal">
         <span class="section-label">Contact Us</span>
-        <h3>与我们取得联系</h3>
-        <p>无论是产品咨询、技术交流还是商务合作，我们都期待与您对话。</p>
+        <h3>开启您的 AI 之旅</h3>
+        <p>注册即送 100,000 Tokens 免费额度，企业客户可申请更长的免费试用期。</p>
         <ul class="contact-list">
-          <li><span class="icon">📧</span><div><strong>邮箱</strong><br>contact@zhibeitech.com</div></li>
+          <li><span class="icon">📧</span><div><strong>商务合作</strong><br>business@zhibeitech.com</div></li>
+          <li><span class="icon">🔑</span><div><strong>API 接入</strong><br>api@zhibeitech.com</div></li>
           <li><span class="icon">📞</span><div><strong>电话</strong><br>400-888-8888</div></li>
-          <li><span class="icon">📍</span><div><strong>地址</strong><br>北京市海淀区中关村科技园</div></li>
-          <li><span class="icon">🕐</span><div><strong>工作时间</strong><br>周一至周五 9:00 - 18:00</div></li>
         </ul>
       </div>
       <div class="contact-form reveal">
         <form id="contactForm">
-          <div class="form-group"><label>姓名</label><input type="text" name="name" placeholder="请输入您的姓名" required></div>
-          <div class="form-group"><label>公司</label><input type="text" name="company" placeholder="请输入公司名称"></div>
-          <div class="form-group"><label>邮箱</label><input type="email" name="email" placeholder="请输入邮箱地址" required></div>
-          <div class="form-group"><label>留言</label><textarea name="message" placeholder="请描述您的需求..." required></textarea></div>
-          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">提交咨询</button>
+          <div class="form-row">
+            <div class="form-group"><label>姓名</label><input type="text" name="name" required></div>
+            <div class="form-group"><label>公司</label><input type="text" name="company"></div>
+          </div>
+          <div class="form-group"><label>邮箱</label><input type="email" name="email" required></div>
+          <div class="form-group"><label>需求</label>
+            <select name="need">
+              <option>API 接入咨询</option>
+              <option>私有化部署</option>
+              <option>技术合作</option>
+              <option>其他</option>
+            </select>
+          </div>
+          <div class="form-group"><label>留言</label><textarea name="message" rows="4" required placeholder="简单描述您的业务场景和需求..."></textarea></div>
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">🚀 立即提交</button>
         </form>
       </div>
     </div>
   </div>
 </section>
+
+<!-- Footer -->
 <footer class="footer">
   <div class="footer-grid">
-    <div class="footer-brand"><a href="#" class="logo"><div class="logo-icon">智</div><span class="logo-text">智北科技</span></a><p>专注于人工智能与云计算的创新型科技企业。</p></div>
-    <div class="footer-col"><h4>产品</h4><ul><li><a href="#">智北 AI 助手</a></li><li><a href="#">智北数据中台</a></li><li><a href="#">智北云原生平台</a></li><li><a href="#">行业解决方案</a></li></ul></div>
-    <div class="footer-col"><h4>公司</h4><ul><li><a href="#">关于我们</a></li><li><a href="#">加入我们</a></li><li><a href="#">新闻动态</a></li><li><a href="#">合作伙伴</a></li></ul></div>
-    <div class="footer-col"><h4>资源</h4><ul><li><a href="#">开发文档</a></li><li><a href="#">API 参考</a></li><li><a href="#">客户案例</a></li><li><a href="#">帮助中心</a></li></ul></div>
+    <div class="footer-brand">
+      <a href="#" class="logo">
+        <div class="logo-icon">智</div>
+        <span class="logo-text">智北科技</span>
+      </a>
+      <p>自研企业级 AI 大模型 · 开放 API 平台 · 让每一家企业都拥有智能大脑</p>
+    </div>
+    <div class="footer-col">
+      <h4>AI 产品</h4>
+      <ul>
+        <li><a href="#ai">ZB-Large 大模型</a></li>
+        <li><a href="#ai">ZB-Turbo 极速模型</a></li>
+        <li><a href="#ai">ZB-Code 代码模型</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>API 平台</h4>
+      <ul>
+        <li><a href="api-docs.html">API 文档</a></li>
+        <li><a href="#pricing">定价方案</a></li>
+        <li><a href="#demo">在线体验</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>公司</h4>
+      <ul>
+        <li><a href="#">关于我们</a></li>
+        <li><a href="#">加入我们</a></li>
+        <li><a href="#contact">联系我们</a></li>
+      </ul>
+    </div>
   </div>
-  <div class="footer-bottom"><p>© 2026 智北科技 ZhiBei Technology. All rights reserved.</p></div>
+  <div class="footer-bottom">
+    <p>© 2026 智北科技 ZhiBei Technology · 自研大模型 Powered · All rights reserved.</p>
+  </div>
 </footer>
+
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 文档 · 智北科技</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <style>
+    .api-layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; max-width: 1400px; margin: 0 auto; padding: 140px 40px 80px; }
+    .api-sidebar { position: sticky; top: 100px; height: fit-content; max-height: calc(100vh - 120px); overflow-y: auto; padding-right: 20px; border-right: 1px solid var(--border-glass); }
+    .api-sidebar h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 24px 0 12px; }
+    .api-sidebar ul { list-style: none; }
+    .api-sidebar a { display: block; padding: 8px 12px; color: var(--text-secondary); text-decoration: none; font-size: 14px; border-radius: 6px; transition: all 0.2s; }
+    .api-sidebar a:hover, .api-sidebar a.active { background: var(--bg-glass); color: var(--accent-cyan); }
+    .api-content { padding-left: 40px; }
+    .api-content h1 { font-size: 42px; font-weight: 800; margin-bottom: 16px; }
+    .api-content h2 { font-size: 28px; font-weight: 700; margin: 60px 0 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-glass); }
+    .api-content h3 { font-size: 20px; font-weight: 600; margin: 30px 0 16px; color: var(--accent-cyan); }
+    .api-content p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 16px; }
+    .endpoint-block { background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); padding: 32px; margin: 24px 0; }
+    .endpoint-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .method { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 700; font-family: monospace; }
+    .method-get { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .method-post { background: rgba(0, 240, 255, 0.15); color: var(--accent-cyan); border: 1px solid rgba(0, 240, 255, 0.3); }
+    .endpoint-path { font-family: monospace; font-size: 18px; font-weight: 600; }
+    .param-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    .param-table th { text-align: left; padding: 12px 16px; background: var(--bg-glass); font-size: 13px; color: var(--accent-purple); font-weight: 600; }
+    .param-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-glass); font-size: 14px; }
+    .param-table code { background: var(--bg-glass); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent-cyan); }
+    .code-block { background: #0d1117; border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 20px; font-family: 'SF Mono', Consolas, monospace; font-size: 13px; line-height: 1.7; overflow-x: auto; margin: 16px 0; }
+    .code-block .label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .code-block pre { margin: 0; white-space: pre-wrap; }
+    .code-block .kw { color: #ff7b72; }
+    .code-block .fn { color: #d2a8ff; }
+    .code-block .str { color: #a5d6ff; }
+    .code-block .cm { color: #8b949e; }
+    .note-block { background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(168,85,247,0.08)); border: 1px solid rgba(0,240,255,0.2); border-radius: var(--radius-md); padding: 20px; margin: 20px 0; }
+    .note-block strong { color: var(--accent-cyan); }
+    @media (max-width: 1024px) { .api-layout { grid-template-columns: 1fr; } .api-sidebar { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--border-glass); padding-bottom: 20px; } .api-content { padding-left: 0; } }
+  </style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a href="index.html" class="logo">
+      <div class="logo-icon">智</div>
+      <span class="logo-text">智北科技</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html">返回首页</a></li>
+    </ul>
+    <a href="index.html#demo" class="nav-cta">在线体验</a>
+  </div>
+</nav>
+
+<div class="api-layout">
+  <aside class="api-sidebar">
+    <h4>快速开始</h4>
+    <ul>
+      <li><a href="#introduction">简介</a></li>
+      <li><a href="#authentication">认证</a></li>
+      <li><a href="#base-url">基础 URL</a></li>
+      <li><a href="#quickstart">快速接入</a></li>
+    </ul>
+    <h4>API 端点</h4>
+    <ul>
+      <li><a href="#endpoint-health">GET /api/health</a></li>
+      <li><a href="#endpoint-models">GET /api/models</a></li>
+      <li><a href="#endpoint-chat">POST /api/chat</a></li>
+      <li><a href="#endpoint-generate">POST /api/generate</a></li>
+      <li><a href="#endpoint-code">POST /api/code</a></li>
+      <li><a href="#endpoint-analyze">POST /api/analyze</a></li>
+    </ul>
+    <h4>错误码</h4>
+    <ul>
+      <li><a href="#errors">错误码说明</a></li>
+    </ul>
+  </aside>
+
+  <main class="api-content">
+    <h1>📚 API 文档</h1>
+    <p style="font-size:18px;">智北科技 AI API · v1.0.0 · 简洁、稳定、高性能的企业级 AI 接口</p>
+
+    <h2 id="introduction">简介</h2>
+    <p>智北科技 AI API 为开发者提供标准化的 RESTful 接口，让您能够轻松将自研大模型能力集成到自己的应用中。我们的 API 支持对话、文本生成、代码生成、数据分析四大核心能力。</p>
+    <div class="note-block"><strong>✨ 特点：</strong>自研大模型驱动 · 毫秒级响应 · 全语言 SDK · 99.9% SLA · 私有化部署支持</div>
+
+    <h2 id="authentication">认证</h2>
+    <p>所有 API 请求需在 HTTP Header 中携带 API Key：</p>
+    <div class="code-block"><div class="label">HTTP Header</div><pre><span class="kw">Authorization</span>: Bearer zb-your-api-key-here
+<span class="kw">Content-Type</span>: application/json</pre></div>
+    <div class="note-block"><strong>🔑 获取 API Key：</strong>访问官网注册后，在控制台"API 密钥"页面生成。每个账号最多可创建 5 个 API Key。</div>
+
+    <h2 id="base-url">基础 URL</h2>
+    <div class="code-block"><div class="label">基础地址</div><pre>生产环境: https://api.zhibeitech.com/v1
+本地调试: http://localhost:8080/api
+演示环境: http://localhost:8080/api</pre></div>
+
+    <h2 id="quickstart">快速接入</h2>
+    <h3>cURL</h3>
+    <div class="code-block"><div class="label">chat 接口示例</div><pre>curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    <span class="str">"model"</span>: <span class="str">"zb-large-v1"</span>,
+    <span class="str">"message"</span>: <span class="str">"你好，介绍一下自己"</span>
+  }'</pre></div>
+
+    <h3>JavaScript / Node.js</h3>
+    <div class="code-block"><pre><span class="kw">import</span> { ZhiBeiAI } <span class="kw">from</span> <span class="str">'@zhibeitech/sdk'</span>;
+
+<span class="kw">const</span> ai = <span class="kw">new</span> ZhiBeiAI({ <span class="str">apiKey</span>: <span class="str">'zb-your-key'</span> });
+
+<span class="kw">async function</span> <span class="fn">main</span>() {
+  <span class="kw">const</span> { reply, usage } = <span class="kw">await</span> ai.<span class="fn">chat</span>([
+    { role: <span class="str">'user'</span>, content: <span class="str">'帮我写一个快速排序'</span> }
+  ]);
+  <span class="fn">console</span>.<span class="fn">log</span>(reply);
+}
+<span class="fn">main</span>();</pre></div>
+
+    <h3>Python</h3>
+    <div class="code-block"><pre><span class="kw">from</span> zhibeiai <span class="kw">import</span> ZhiBeiAI
+
+ai = ZhiBeiAI(api_key=<span class="str">"zb-your-key"</span>)
+
+response = ai.<span class="fn">chat</span>(
+    model=<span class="str">"zb-large-v1"</span>,
+    message=<span class="str">"写一个快速排序函数"</span>
+)
+
+<span class="kw">print</span>(response.reply)</pre></div>
+
+    <!-- Endpoints -->
+    <h2>API 端点</h2>
+
+    <div class="endpoint-block" id="endpoint-health">
+      <div class="endpoint-header">
+        <div class="method method-get">GET</div>
+        <div class="endpoint-path">/api/health</div>
+      </div>
+      <p>服务健康检查，返回 API 运行状态和版本信息。</p>
+      <h3>响应示例</h3>
+      <div class="code-block"><pre>{
+  <span class="str">"status"</span>: <span class="str">"healthy"</span>,
+  <span class="str">"service"</span>: <span class="str">"ZhiBei AI API"</span>,
+  <span class="str">"version"</span>: <span class="str">"1.0.0"</span>,
+  <span class="str">"timestamp"</span>: <span class="str">"2026-10-31T14:00:00Z"</span>
+}</pre></div>
+    </div>
+
+    <div class="endpoint-block" id="endpoint-models">
+      <div class="endpoint-header">
+        <div class="method method-get">GET</div>
+        <div class="endpoint-path">/api/models</div>
+      </div>
+      <p>获取当前账户可用的 AI 模型列表及详细参数。</p>
+      <h3>响应示例</h3>
+      <div class="code-block"><pre>{
+  <span class="str">"models"</span>: [
+    {
+      <span class="str">"id"</span>: <span class="str">"zb-large-v1"</span>,
+      <span class="str">"name"</span>: <span class="str">"智北大模型"</span>,
+      <span class="str">"context_length"</span>: 8192,
+      <span class="str">"capabilities"</span>: [<span class="str">"chat"</span>, <span class="str">"generate"</span>, <span class="str">"code"</span>, <span class="str">"analyze"</span>]
+    }
+  ]
+}</pre></div>
+    </div>
+
+    <div class="endpoint-block" id="endpoint-chat">
+      <div class="endpoint-header">
+        <div class="method method-post">POST</div>
+        <div class="endpoint-path">/api/chat</div>
+      </div>
+      <p>AI 对话接口，支持多轮上下文对话。</p>
+      <h3>请求参数</h3>
+      <table class="param-table">
+        <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>model</code></td><td>string</td><td>否</td><td>模型 ID，默认 <code>zb-large-v1</code></td></tr>
+          <tr><td><code>message</code></td><td>string</td><td>是</td><td>用户消息内容</td></tr>
+          <tr><td><code>messages</code></td><td>array</td><td>否</td><td>多轮消息数组（优先级高于 message）</td></tr>
+          <tr><td><code>temperature</code></td><td>float</td><td>否</td><td>0-1，越高越有创造性，默认 0.7</td></tr>
+          <tr><td><code>max_tokens</code></td><td>int</td><td>否</td><td>最大生成 token 数，默认 2048</td></tr>
+        </tbody>
+      </table>
+      <h3>请求示例</h3>
+      <div class="code-block"><pre>{
+  <span class="str">"model"</span>: <span class="str">"zb-large-v1"</span>,
+  <span class="str">"message"</span>: <span class="str">"你好，介绍一下自己"</span>,
+  <span class="str">"temperature"</span>: 0.7
+}</pre></div>
+      <h3>响应示例</h3>
+      <div class="code-block"><pre>{
+  <span class="str">"id"</span>: <span class="str">"chat_883451"</span>,
+  <span class="str">"model"</span>: <span class="str">"zb-large-v1"</span>,
+  <span class="str">"reply"</span>: <span class="str">"您好！我是智北 AI 助手..."</span>,
+  <span class="str">"usage"</span>: {
+    <span class="str">"prompt_tokens"</span>: 12,
+    <span class="str">"completion_tokens"</span>: 128,
+    <span class="str">"total_tokens"</span>: 140
+  },
+  <span class="str">"timestamp"</span>: <span class="str">"2026-10-31T14:00:00Z"</span>
+}</pre></div>
+    </div>
+
+    <div class="endpoint-block" id="endpoint-generate">
+      <div class="endpoint-header">
+        <div class="method method-post">POST</div>
+        <div class="endpoint-path">/api/generate</div>
+      </div>
+      <p>智能文本生成接口，支持文章、摘要、翻译、创意写作等场景。</p>
+      <h3>请求参数</h3>
+      <table class="param-table">
+        <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>prompt</code></td><td>string</td><td>是</td><td>生成提示词</td></tr>
+          <tr><td><code>model</code></td><td>string</td><td>否</td><td>模型 ID</td></tr>
+          <tr><td><code>task</code></td><td>string</td><td>否</td><td>任务类型：generate/summarize/translate</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="endpoint-block" id="endpoint-code">
+      <div class="endpoint-header">
+        <div class="method method-post">POST</div>
+        <div class="endpoint-path">/api/code</div>
+      </div>
+      <p>AI 代码助手，支持 Python、JavaScript、Go、SQL 等主流语言的代码生成与调试。</p>
+      <h3>请求参数</h3>
+      <table class="param-table">
+        <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>prompt</code></td><td>string</td><td>是</td><td>代码需求描述</td></tr>
+          <tr><td><code>language</code></td><td>string</td><td>否</td><td>目标语言，默认 python</td></tr>
+          <tr><td><code>model</code></td><td>string</td><td>否</td><td>推荐使用 zb-code-v1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="endpoint-block" id="endpoint-analyze">
+      <div class="endpoint-header">
+        <div class="method method-post">POST</div>
+        <div class="endpoint-path">/api/analyze</div>
+      </div>
+      <p>AI 数据分析接口，自动识别趋势、检测异常、生成洞察。</p>
+      <h3>请求参数</h3>
+      <table class="param-table">
+        <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>data_description</code></td><td>string</td><td>是</td><td>数据描述或数据本身</td></tr>
+          <tr><td><code>task</code></td><td>string</td><td>否</td><td>任务类型：trend_detection/anomaly_detection/forecast</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="errors">错误码说明</h2>
+    <table class="param-table">
+      <thead><tr><th>HTTP 状态码</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>200</td><td>请求成功</td></tr>
+        <tr><td>400</td><td>请求参数错误</td></tr>
+        <tr><td>401</td><td>API Key 无效或缺失</td></tr>
+        <tr><td>403</td><td>权限不足 / 额度耗尽</td></tr>
+        <tr><td>404</td><td>接口不存在</td></tr>
+        <tr><td>429</td><td>请求过于频繁，触发限流</td></tr>
+        <tr><td>500</td><td>服务器内部错误</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note-block" style="margin-top:40px;text-align:center;">
+      <strong>需要帮助？</strong><br>
+      联系我们的技术团队：<code>api@zhibeitech.com</code> · 或在官网开启在线客服
+    </div>
+  </main>
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>
