@@ -1,0 +1,75 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>轨道科普 · 智北学院</title>
+<link rel="stylesheet" href="css/rail.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚆</text></svg>">
+</head><body>
+<!-- Loading -->
+<div class="rb-loader" id="rbLoader">
+  <div class="rb-loader-logo">🚆</div>
+  <div class="rb-loader-text">智北轨道科普 · 正在加载课程库…</div>
+</div>
+
+<!-- App -->
+<div class="rb-app" id="rbApp" style="display:none">
+  <!-- Navbar -->
+  <header class="rb-nav">
+    <div class="rb-nav-inner">
+      <a href="index.html" class="rb-logo">
+        <div class="rb-logo-ic">智</div>
+        <div class="rb-logo-text">
+          <div class="rb-logo-t1">智北学院</div>
+          <div class="rb-logo-t2">轨道科普</div>
+        </div>
+      </a>
+      <nav class="rb-nav-links">
+        <a href="index.html">🏠 官网</a>
+        <a href="enterprise.html">🏢 企业后台</a>
+        <a href="workbench.html">💼 工作台</a>
+        <a href="#" class="rb-active">🚆 轨道科普</a>
+      </nav>
+      <div class="rb-nav-right">
+        <span class="rb-stats">
+          💰 <span id="rbQuota">—</span> tokens · 
+          ✅ <span id="rbProgress">0</span>/2000
+        </span>
+        <a href="#" class="rb-login-btn" id="rbLoginBtn" onclick="openRailAuth()">登录</a>
+        <a href="#" class="rb-logout-btn" id="rbLogoutBtn" style="display:none" onclick="doRailLogout()">退出</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="rb-main" id="rbMain">
+    <!-- Views injected here -->
+  </main>
+</div>
+
+<!-- Login Modal -->
+<div class="rb-modal-bg" id="rbLoginModal" style="display:none">
+  <div class="rb-modal">
+    <div class="rb-modal-head"><h3>登录智北学院</h3><span onclick="document.getElementById('rbLoginModal').style.display='none'" class="rb-close">✕</span></div>
+    <div class="rb-modal-body">
+      <div class="rb-f"><label>账号</label><input id="rbMUser" placeholder="请输入账号"></div>
+      <div class="rb-f"><label>密码</label><input id="rbMPass" type="password" placeholder="请输入密码"></div>
+      <div class="rb-err" id="rbMErr"></div>
+      <button class="rb-btn-primary" id="rbMBtn" onclick="doRailLogin()">登录</button>
+      <div class="rb-hint">💡 注册账号即可开始学习</div>
+    </div>
+  </div>
+</div>
+
+<!-- Purchase Modal -->
+<div class="rb-modal-bg" id="rbBuyModal" style="display:none">
+  <div class="rb-modal rb-buy">
+    <div class="rb-modal-head"><h3>🔒 解锁此内容</h3><span onclick="document.getElementById('rbBuyModal').style.display='none'" class="rb-close">✕</span></div>
+    <div class="rb-modal-body" id="rbBuyBody"></div>
+    <div class="rb-modal-foot">
+      <button class="rb-btn-secondary" onclick="document.getElementById('rbBuyModal').style.display='none'">取消</button>
+      <button class="rb-btn-primary" id="rbBuyBtn" onclick="confirmRailBuy()">确认解锁</button>
+    </div>
+  </div>
+</div>
+
+<script defer src="js/rail.js"></script>
+</body></html>

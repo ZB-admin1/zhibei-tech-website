@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>智北工作台 · ZhiBei Workbench</title>
+<link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23165DFF'/%3E%3Ctext x='32' y='42' font-size='32' font-family='Arial' font-weight='900' text-anchor='middle' fill='white'%3EZB%3C/text%3E%3C/svg%3E">
+<link href="css/workbench.css" rel="stylesheet">
+<style>
+.app-shell-container{height:100%;width:100%;display:flex;flex-direction:column}
+.app-shell-hide{display:none}
+.app-shell-loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999}
+.app-shell-loading-image{line-height:0}
+.app-shell-loading-container{width:64px;height:64px;position:relative}
+.app-shell-loading-container::before{content:"";position:absolute;inset:0;border-radius:50%;border:4px solid #E8F3FF;border-top-color:#165DFF;animation:zb-spin 0.9s linear infinite}
+.app-shell-loading-text{margin-top:20px;text-align:center;color:#86909C;font-size:13px;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+@keyframes zb-spin{to{transform:rotate(360deg)}}
+</style>
+<script>
+// ZhiBei runtime config (仿飞书壳 window.__xxx)
+window.__zbRuntime = {
+  appName: "智北工作台",
+  version: "1.0.0",
+  apiBase: "/api",
+  brandColor: "#165DFF",
+  supportLangs: ["zh-CN","en-US"]
+};
+</script>
+</head>
+<body id="root-host" class="zb-workbench">
+
+<!-- Loading 动画 (仿飞书 app-shell-loading) -->
+<div class="app-shell-loading" id="zbLoading">
+  <div class="app-shell-loading-image">
+    <div class="app-shell-loading-container"></div>
+  </div>
+  <div class="app-shell-loading-text">智北工作台 · 正在加载…</div>
+</div>
+
+<!-- SPA 挂载容器 (仿飞书 app-shell-container + #app + #__overlay-container__) -->
+<div class="app-shell-container app-shell-hide" id="zbShell">
+  <div class="zb-banner" id="zbBanner"></div>
+  <div class="zb-app">
+    <div id="zbApp"></div>
+    <div id="zbOverlay" style="position:absolute;top:0;left:0;height:0;z-index:2"></div>
+  </div>
+</div>
+
+<!-- 主脚本 (defer 仿飞书 vendor + main 模式) -->
+<script defer src="js/workbench.js"></script>
+
+</body></html>

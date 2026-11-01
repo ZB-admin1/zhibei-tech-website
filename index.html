@@ -21,14 +21,18 @@
     <ul class="nav-links">
       <li><a href="#home">首页</a></li>
       <li><a href="#ai">ZB AI</a></li>
+      <li><a href="#ecosystem">产品矩阵</a></li>
+      <li><a href="rail-academy.html">🚆 轨道科普</a></li>
       <li><a href="#demo">在线体验</a></li>
       <li><a href="#api">API</a></li>
       <li><a href="#pricing">定价</a></li>
       <li><a href="#contact">联系我们</a></li>
     </ul>
     <div class="nav-actions">
-      <a href="api-docs.html" class="nav-link-btn">API 文档</a>
-      <a href="#pricing" class="nav-link-btn">ZBpay 充值</a>
+      <a href="api-docs.html" class="nav-link-btn">📚 API 文档</a>
+      <a href="workbench.html" class="nav-link-btn">💼 工作台</a>
+      <a href="admin.html" class="nav-link-btn">🛠️ 管理后台</a>
+      <a href="#pricing" class="nav-link-btn">💰 ZBpay 充值</a>
       <!-- Guest state -->
       <span id="navGuest">
         <button class="nav-link-btn" onclick="openAuth('login')">登录</button>
@@ -183,6 +187,124 @@
           <p>趋势预测 · 异常检测 · 自动洞察</p>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Ecosystem / Product Matrix -->
+<section class="section" id="ecosystem">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="section-label">Our Ecosystem</span>
+      <h2 class="section-title">智北产品矩阵 · 从 AI 到行业应用</h2>
+      <p class="section-desc">自研大模型 + 开放 API + 行业产品，一站式满足开发者、企业、教育场景</p>
+    </div>
+
+    <div class="ecosystem-grid reveal" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:32px;">
+      <!-- Rail Academy -->
+      <a href="rail-academy.html" class="eco-card" style="background:linear-gradient(135deg,#1a3a5c 0%,#0d2137 100%);border:1px solid rgba(56,189,248,0.2);border-radius:16px;padding:28px;text-decoration:none;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;gap:14px;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 40px rgba(56,189,248,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:40px;">🚆</div>
+          <div>
+            <div style="color:#fff;font-size:18px;font-weight:700;">轨道科普学院</div>
+            <div style="color:rgba(148,163,184,0.9);font-size:12px;">Rail Academy · 激活码解锁</div>
+          </div>
+        </div>
+        <p style="color:rgba(203,213,225,0.9);font-size:13px;line-height:1.7;margin:0;">
+          2000+ 条轨道科普课程 · 20 个单元 · 含视频 + 图文详解。
+          使用管理员发放的激活码永久解锁，支持单元(¥89) / 部分(¥9) / 单课(¥1)三档。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:rgba(56,189,248,0.15);color:#38bdf8;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">🔑 激活码解锁</span>
+          <span style="background:rgba(16,185,129,0.15);color:#34d399;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">📚 2000+ 课程</span>
+          <span style="background:rgba(249,115,22,0.15);color:#fb923c;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">🎬 视频教学</span>
+        </div>
+        <div style="color:#38bdf8;font-size:13px;font-weight:600;margin-top:auto;">进入学院 →</div>
+      </a>
+
+      <!-- Workbench -->
+      <a href="workbench.html" class="eco-card" style="background:linear-gradient(135deg,#0f2a1a 0%,#0a1f14 100%);border:1px solid rgba(52,211,153,0.2);border-radius:16px;padding:28px;text-decoration:none;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;gap:14px;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 40px rgba(52,211,153,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:40px;">💼</div>
+          <div>
+            <div style="color:#fff;font-size:18px;font-weight:700;">智北工作台</div>
+            <div style="color:rgba(148,163,184,0.9);font-size:12px;">Workbench · 个人生产</div>
+          </div>
+        </div>
+        <p style="color:rgba(203,213,225,0.9);font-size:13px;line-height:1.7;margin:0;">
+          一站式个人 AI 工作台 · AI 对话、代码生成、数据分析、待办事项多应用聚合入口。
+          数据云端同步，支持多设备访问。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:rgba(52,211,153,0.15);color:#34d399;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">🤖 AI 对话</span>
+          <span style="background:rgba(56,189,248,0.15);color:#38bdf8;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">💻 代码</span>
+          <span style="background:rgba(168,85,247,0.15);color:#c084fc;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">📊 分析</span>
+        </div>
+        <div style="color:#34d399;font-size:13px;font-weight:600;margin-top:auto;">打开工作台 →</div>
+      </a>
+
+      <!-- Enterprise -->
+      <a href="enterprise.html" class="eco-card" style="background:linear-gradient(135deg,#1e1b4b 0%,#131129 100%);border:1px solid rgba(168,85,247,0.2);border-radius:16px;padding:28px;text-decoration:none;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;gap:14px;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 40px rgba(168,85,247,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:40px;">🏢</div>
+          <div>
+            <div style="color:#fff;font-size:18px;font-weight:700;">企业管理后台</div>
+            <div style="color:rgba(148,163,184,0.9);font-size:12px;">Enterprise · 组织架构</div>
+          </div>
+        </div>
+        <p style="color:rgba(203,213,225,0.9);font-size:13px;line-height:1.7;margin:0;">
+          企业级组织管理 · 部门架构、员工账户、权限控制、审计日志、API 密钥统一管理。
+          私有化部署可选，满足合规要求。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:rgba(168,85,247,0.15);color:#c084fc;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">👥 组织架构</span>
+          <span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">🔐 权限管理</span>
+          <span style="background:rgba(244,63,94,0.15);color:#fb7185;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">📋 审计日志</span>
+        </div>
+        <div style="color:#c084fc;font-size:13px;font-weight:600;margin-top:auto;">进入企业后台 →</div>
+      </a>
+
+      <!-- Admin -->
+      <a href="admin.html" class="eco-card" style="background:linear-gradient(135deg,#3c1d0f 0%,#2a1408 100%);border:1px solid rgba(251,146,60,0.2);border-radius:16px;padding:28px;text-decoration:none;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;gap:14px;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 40px rgba(251,146,60,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:40px;">🛠️</div>
+          <div>
+            <div style="color:#fff;font-size:18px;font-weight:700;">超级管理后台</div>
+            <div style="color:rgba(148,163,184,0.9);font-size:12px;">Admin · 平台运维</div>
+          </div>
+        </div>
+        <p style="color:rgba(203,213,225,0.9);font-size:13px;line-height:1.7;margin:0;">
+          平台级运维后台 · 数据概览、用户管理、订单财务、模型用量、轨道激活码批量管理。
+          Admin 账号自动解锁全部轨道科普单元。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:rgba(251,146,60,0.15);color:#fb923c;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">📊 数据大盘</span>
+          <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">🔑 激活码管理</span>
+          <span style="background:rgba(234,179,8,0.15);color:#facc15;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">💰 订单财务</span>
+        </div>
+        <div style="color:#fb923c;font-size:13px;font-weight:600;margin-top:auto;">进入管理后台 →</div>
+      </a>
+
+      <!-- API Docs -->
+      <a href="api-docs.html" class="eco-card" style="background:linear-gradient(135deg,#0c4a6e 0%,#082f49 100%);border:1px solid rgba(14,165,233,0.2);border-radius:16px;padding:28px;text-decoration:none;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;gap:14px;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 40px rgba(14,165,233,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:40px;">📚</div>
+          <div>
+            <div style="color:#fff;font-size:18px;font-weight:700;">API 文档</div>
+            <div style="color:rgba(148,163,184,0.9);font-size:12px;">Developer · 接入指南</div>
+          </div>
+        </div>
+        <p style="color:rgba(203,213,225,0.9);font-size:13px;line-height:1.7;margin:0;">
+          完整 API 参考 · RESTful 设计 · cURL / JavaScript / Python 多语言示例 · 错误码说明。
+          3 行代码即可接入智北 AI。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="background:rgba(14,165,233,0.15);color:#38bdf8;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">RESTful</span>
+          <span style="background:rgba(34,197,94,0.15);color:#4ade80;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">多语言 SDK</span>
+          <span style="background:rgba(239,68,68,0.15);color:#f87171;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:600;">错误码</span>
+        </div>
+        <div style="color:#38bdf8;font-size:13px;font-weight:600;margin-top:auto;">查看 API 文档 →</div>
+      </a>
     </div>
   </div>
 </section>
@@ -422,23 +544,34 @@ res = requests.<span class="code-function">post</span>(<span class="code-string"
       <p>自研企业级 AI 大模型 · 开放 API 平台 · 让每一家企业都拥有智能大脑</p>
     </div>
     <div class="footer-col">
-      <h4>AI 产品</h4>
+      <h4>🚆 产品矩阵</h4>
+      <ul>
+        <li><a href="rail-academy.html">轨道科普学院 · 激活码解锁</a></li>
+        <li><a href="workbench.html">智北工作台 · 个人生产</a></li>
+        <li><a href="enterprise.html">企业管理后台 · 组织架构</a></li>
+        <li><a href="admin.html">超级管理后台 · 平台运维</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>🤖 AI 产品</h4>
       <ul>
         <li><a href="#ai">ZB-Large 大模型</a></li>
         <li><a href="#ai">ZB-Turbo 极速模型</a></li>
         <li><a href="#ai">ZB-Code 代码模型</a></li>
+        <li><a href="#demo">在线体验 AI</a></li>
       </ul>
     </div>
     <div class="footer-col">
-      <h4>API 平台</h4>
+      <h4>🔧 API 平台</h4>
       <ul>
         <li><a href="api-docs.html">API 文档</a></li>
-        <li><a href="#pricing">定价方案</a></li>
-        <li><a href="#demo">在线体验</a></li>
+        <li><a href="#api">API 端点</a></li>
+        <li><a href="#pricing">ZBpay 定价方案</a></li>
+        <li><a href="#pricing">充值中心</a></li>
       </ul>
     </div>
     <div class="footer-col">
-      <h4>公司</h4>
+      <h4>🏢 公司</h4>
       <ul>
         <li><a href="#">关于我们</a></li>
         <li><a href="#">加入我们</a></li>

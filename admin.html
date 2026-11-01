@@ -87,10 +87,9 @@
     </div>
     <div class="form-group">
       <label>密码</label>
-      <input type="password" id="adminPass" placeholder="CSFXlhy14">
+      <input type="password" id="adminPass" placeholder="请输入密码">
     </div>
     <button id="adminLoginBtn">进入管理后台</button>
-    <p style="text-align:center;margin-top:20px;font-size:12px;color:var(--text-muted);">默认密码: admin / CSFXlhy14</p>
   </div>
 </div>
 
@@ -105,6 +104,7 @@
       <li><a href="#" class="active" data-view="overview">📊 数据概览</a></li>
       <li><a href="#" data-view="users">👥 用户管理</a></li>
       <li><a href="#" data-view="pay">💰 支付管理</a></li>
+      <li><a href="#" data-view="rail-codes">🔑 轨道激活码</a></li>
       <li><a href="#" data-view="models">🧠 模型调用</a></li>
       <li><a href="index.html">↩️ 返回官网</a></li>
     </ul>
@@ -238,6 +238,70 @@
             </tr></thead>
             <tbody id="orderTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);">加载中...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Rail Activation Codes -->
+      <div id="view-rail-codes" style="display:none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">激活码总数</div>
+            <div class="value" id="rcTotal">0</div>
+            <div class="sub">轨道科普 · 手动管理</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">库存可用</div>
+            <div class="value" id="rcAvail" style="color:#4ade80;">0</div>
+            <div class="sub">status: available</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">已售出</div>
+            <div class="value" id="rcSold" style="color:#fbbf24;">0</div>
+            <div class="sub">status: sold</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">已使用</div>
+            <div class="value" id="rcUsed" style="color:#f87171;">0</div>
+            <div class="sub">status: used</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;margin-bottom:24px;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 激活码列表</div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <select id="rcFilter" onchange="loadRailCodes()" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+                  <option value="">全部状态</option>
+                  <option value="available">可用</option>
+                  <option value="sold">已售</option>
+                  <option value="used">已用</option>
+                </select>
+                <input id="rcSearch" oninput="loadRailCodes()" placeholder="🔍 搜索 / used_by / batch" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;width:220px;">
+              </div>
+            </div>
+            <table>
+              <thead><tr>
+                <th>激活码</th><th>目标</th><th>价格</th><th>状态</th><th>批次</th><th>使用人</th><th>操作</th>
+              </tr></thead>
+              <tbody id="rcTableBody"><tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">加载中...</td></tr></tbody>
+            </table>
+            <div id="rcPager" style="margin-top:12px;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text-muted);"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">📥 批量导入激活码</div></div>
+            <div style="margin-bottom:12px;font-size:12px;color:var(--text-muted);">手动粘贴多行激活码（每行一个）。系统不能自动创建/删除码，只能手动导入/删除。</div>
+            <textarea id="rcImportText" rows="8" placeholder="ZB-XXXXXXXXXXXX&#10;ZB-XXXXXXXXXXXX&#10;..." style="width:100%;padding:12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-family:monospace;font-size:12px;resize:vertical;"></textarea>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+              <input id="rcImportBatch" placeholder="批次标签 (默认 admin-import-时间)" style="flex:1;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+              <input id="rcImportPrice" type="number" value="0" placeholder="价格 (0=无指定)" style="width:100px;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+              <button onclick="importRailCodes()" style="flex:1;padding:10px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;">📥 批量导入</button>
+            </div>
+            <div id="rcImportResult" style="margin-top:10px;font-size:12px;"></div>
+          </div>
         </div>
       </div>
     </main>
@@ -419,12 +483,13 @@
       document.querySelectorAll('.admin-nav a').forEach(x => x.classList.remove('active'));
       a.classList.add('active');
       const v = a.dataset.view;
-      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', models:'🧠 模型调用'}[v];
-      ['overview','users','pay','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
+      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', 'rail-codes':'🔑 轨道激活码', models:'🧠 模型调用'}[v];
+      ['overview','users','pay','rail-codes','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
       document.getElementById('view-'+v).style.display = '';
       if (v === 'users') loadUsers();
       if (v === 'overview') loadOverview();
       if (v === 'pay') loadPay();
+      if (v === 'rail-codes') loadRailCodes();
     };
   });
 
@@ -442,6 +507,94 @@
   window.resetQuota = (u) => {
     api(`/api/admin/users/${u}/quota`, 'POST', { quota_tokens: 100000 }).then(() => loadUsers());
   };
+
+  // --- Rail Activation Codes Admin ---
+  let rcPage = 1;
+  async function loadRailCodes() {
+    try {
+      const filter = document.getElementById('rcFilter').value;
+      const q = document.getElementById('rcSearch').value.trim();
+      const url = `/api/admin/rail/codes?page=${rcPage}&size=20` +
+        (filter ? `&status=${filter}` : '') +
+        (q ? `&q=${q}` : '');
+      const data = await api(url);
+      document.getElementById('rcTotal').textContent = data.total;
+      document.getElementById('rcAvail').textContent = data.stats.available;
+      document.getElementById('rcSold').textContent = data.stats.sold;
+      document.getElementById('rcUsed').textContent = data.stats.used;
+      const tbody = document.getElementById('rcTableBody');
+      if (!data.codes || data.codes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:30px;">暂无激活码</td></tr>';
+      } else {
+        const statusMap = { available: { text: '可用', cls: 'color:#4ade80;background:rgba(74,222,128,0.1)' },
+                           sold:      { text: '已售', cls: 'color:#fbbf24;background:rgba(251,191,36,0.1)' },
+                           used:      { text: '已用', cls: 'color:#f87171;background:rgba(248,113,113,0.1)' } };
+        tbody.innerHTML = data.codes.map(c => {
+          const st = statusMap[c.status] || { text: c.status, cls: '' };
+          const tgtMap = { unit: '单元', part: '部分', lesson: '小结' };
+          const tgtTxt = c.target_kind ? `${tgtMap[c.target_kind]||c.target_kind} · ${c.target_id}` : '未指定';
+          const ops = c.status === 'used'
+            ? `<button onclick="resetRailCode('${c.code}')" style="padding:4px 10px;background:rgba(74,222,128,0.15);color:#4ade80;border:1px solid rgba(74,222,128,0.3);border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px;">重置</button>`
+            : c.status === 'sold'
+            ? `<button onclick="resetRailCode('${c.code}')" style="padding:4px 10px;background:rgba(74,222,128,0.15);color:#4ade80;border:1px solid rgba(74,222,128,0.3);border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px;">重置</button>
+               <button onclick="markSoldRailCode('${c.code}')" disabled style="padding:4px 10px;background:rgba(251,191,36,0.3);color:#fbbf24;border:1px solid rgba(251,191,36,0.5);border-radius:6px;font-size:12px;cursor:not-allowed;">已售</button>`
+            : `<button onclick="markSoldRailCode('${c.code}')" style="padding:4px 10px;background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);border-radius:6px;cursor:pointer;font-size:12px;margin-right:6px;">标记售</button>`;
+          return `<tr>
+            <td style="font-family:monospace;font-size:12px;color:var(--accent-cyan);">${c.code}</td>
+            <td style="font-size:12px;">${tgtTxt}</td>
+            <td style="color:var(--text-muted);font-size:12px;">¥${c.price||0}</td>
+            <td><span style="padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;${st.cls}">${st.text}</span></td>
+            <td style="color:var(--text-muted);font-size:11px;">${c.batch||'-'}</td>
+            <td style="font-size:12px;">${c.used_by||'-'}</td>
+            <td>${ops}</td>
+          </tr>`;
+        }).join('');
+      }
+      // Pager
+      const totalPages = Math.max(1, Math.ceil(data.filtered_total / data.page_size));
+      const pager = document.getElementById('rcPager');
+      let html = `共 ${data.filtered_total} 条 · 页码 ${rcPage}/${totalPages}`;
+      html += `<button onclick="rcPage=${Math.max(1,rcPage-1)};loadRailCodes()" ${rcPage<=1?'disabled':''} style="margin-left:12px;padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:11px;">上一页</button>`;
+      html += `<button onclick="rcPage=${Math.min(totalPages, rcPage + 1)};loadRailCodes()" ${rcPage>=totalPages?'disabled':''} style="padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:11px;">下一页</button>`;
+      pager.innerHTML = html;
+    } catch(e) { console.warn('rail codes load failed', e); }
+  }
+
+  async function importRailCodes() {
+    const text = document.getElementById('rcImportText').value.trim();
+    const batch = document.getElementById('rcImportBatch').value.trim();
+    const price = parseInt(document.getElementById('rcImportPrice').value) || 0;
+    const resEl = document.getElementById('rcImportResult');
+    if (!text) { resEl.style.color = '#ef4444'; resEl.textContent = '请输入激活码'; return; }
+    try {
+      const r = await api('/api/admin/rail/codes/import', 'POST', { codes_text: text, batch, price });
+      resEl.style.color = '#4ade80';
+      resEl.textContent = `✓ 导入完成：新增 ${r.added} 个，跳过重复 ${r.skipped} 个`;
+      document.getElementById('rcImportText').value = '';
+      loadRailCodes();
+    } catch(e) { resEl.style.color = '#ef4444'; resEl.textContent = '导入失败: ' + (e.message||''); }
+  }
+  window.importRailCodes = importRailCodes;
+
+  async function markSoldRailCode(code) {
+    if (!confirm(`确定标记激活码 ${code} 为「已售」？`)) return;
+    try { await api('/api/admin/rail/codes/mark-sold', 'POST', { code }); toastAdmin('✓ 已标记为已售'); loadRailCodes(); }
+    catch(e) { toastAdmin('❌ ' + (e.message||'')); }
+  }
+  window.markSoldRailCode = markSoldRailCode;
+
+  async function resetRailCode(code) {
+    if (!confirm(`重置激活码 ${code} 为「可用」？\n使用记录将被清除。`)) return;
+    try { await api('/api/admin/rail/codes/reset', 'POST', { code }); toastAdmin('✓ 已重置为可用'); loadRailCodes(); }
+    catch(e) { toastAdmin('❌ ' + (e.message||'')); }
+  }
+  window.resetRailCode = resetRailCode;
+
+  function toastAdmin(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg; t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;';
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2000);
+  }
 })();
 </script>
 </body>

@@ -1,0 +1,30 @@
+# ========== ZhiBei AI Platform ==========
+
+# Data & runtime (sensitive - never commit)
+data/
+*.log
+_tmp_*
+_token.txt
+_body.json
+_test_code.txt
+_login_test.json
+_redeem.json
+_reg.json
+
+# Trae IDE artifacts
+.screenshots/
+.trae-html-share-packages/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node (if any tooling)
+node_modules/
+package-lock.json
+yarn.lock

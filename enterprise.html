@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智北企业后台 · ZhiBei Enterprise Admin</title>
+<style>
+:root{
+  --brand:#165DFF;--brand-light:#4080FF;--brand-bg:#E8F3FF;
+  --bg:#F7F8FA;--bg-card:#FFFFFF;--bg-hover:#F2F3F5;
+  --border:#E5E6EB;--border-strong:#D4D6D9;
+  --text:#1D2129;--text-2:#4E5969;--text-3:#86909C;--text-4:#C9CDD4;
+  --success:#00B42A;--warning:#FF7D00;--danger:#F53F3F;--purple:#722ED1;
+  --radius:8px;--shadow:0 2px 8px rgba(0,0,0,0.06);--shadow-lg:0 8px 32px rgba(0,0,0,0.12);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:12px 16px;font-weight:500;color:var(--text-3);font-size:12px;background:#FAFBFC;border-bottom:1px solid var(--border)}
+td{padding:14px 16px;border-bottom:1px solid var(--border);color:var(--text-2);font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFBFC}
+
+/* ============ LOGIN ============ */
+.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#165DFF 0%,#4080FF 50%,#0FC6C2 100%);padding:40px}
+.login-card{width:400px;background:#fff;border-radius:16px;padding:48px 40px;box-shadow:var(--shadow-lg)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.login-logo .logo-ic{width:40px;height:40px;background:var(--brand);border-radius:10px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px}
+.login-logo .logo-t{font-size:20px;font-weight:700}
+.login-slogan{color:var(--text-3);font-size:13px;margin-bottom:32px;margin-top:4px}
+.login-form .f{margin-bottom:20px}
+.login-form label{display:block;font-size:13px;color:var(--text-2);margin-bottom:8px}
+.login-form input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border .2s}
+.login-form input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(22,93,255,0.1)}
+.login-btn{width:100%;padding:12px;background:var(--brand);color:#fff;border-radius:8px;font-size:15px;font-weight:600;margin-top:8px;transition:background .2s}
+.login-btn:hover{background:#0E47D9}
+.login-err{color:var(--danger);font-size:13px;margin-top:10px;display:none}
+
+/* ============ LAYOUT ============ */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:#1D2129;color:#C9CDD4;padding:16px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:8px 20px 20px;border-bottom:1px solid #2A2E35;margin-bottom:12px}
+.sb-logo .ic{width:32px;height:32px;background:var(--brand);border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
+.sb-logo .tn{font-size:15px;font-weight:700;color:#fff}
+.sb-logo .ts{font-size:11px;color:var(--text-4)}
+.sb-group-title{font-size:11px;color:#4E5969;padding:12px 20px 6px;text-transform:uppercase;letter-spacing:.08em}
+.sb-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#C9CDD4;font-size:13px;cursor:pointer;transition:all .15s;border-left:2px solid transparent}
+.sb-item:hover{background:#2A2E35;color:#fff}
+.sb-item.active{background:linear-gradient(90deg,rgba(22,93,255,0.2),transparent);color:#fff;border-left-color:var(--brand)}
+.sb-item .ic{width:18px;text-align:center;font-size:14px}
+.sb-item .badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px}
+.content{display:flex;flex-direction:column;min-width:0}
+.topbar{height:56px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;position:sticky;top:0;z-index:50}
+.tb-title{font-size:16px;font-weight:600}
+.tb-crumbs{color:var(--text-3);font-size:13px;margin-left:8px}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.tb-search{padding:7px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:13px;width:200px}
+.tb-search:focus{outline:none;border-color:var(--brand)}
+.tb-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--text-2);font-size:16px;position:relative}
+.tb-btn:hover{background:var(--bg-hover)}
+.tb-btn .dot{position:absolute;top:8px;right:8px;width:8px;height:8px;background:var(--danger);border-radius:50%}
+.tb-avatar{width:32px;height:32px;background:var(--brand);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.tb-user{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.tb-user:hover{background:var(--bg-hover)}
+.tb-user .name{font-size:13px}
+.tb-user .role{font-size:11px;color:var(--text-3)}
+
+.main{padding:24px;overflow-x:auto}
+
+/* ============ CARDS / STATS ============ */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:var(--radius);padding:20px;border:1px solid var(--border);transition:box-shadow .2s}
+.stat-card:hover{box-shadow:var(--shadow)}
+.sc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sc-label{color:var(--text-3);font-size:13px}
+.sc-ic{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.sc-ic.blue{background:#E8F3FF;color:var(--brand)}
+.sc-ic.green{background:#E8FFEA;color:var(--success)}
+.sc-ic.orange{background:#FFF7E8;color:var(--warning)}
+.sc-ic.red{background:#FFECE8;color:var(--danger)}
+.sc-ic.purple{background:#F5E8FF;color:var(--purple)}
+.sc-val{font-size:26px;font-weight:700;color:var(--text)}
+.sc-trend{font-size:12px;margin-top:6px}
+.sc-trend.up{color:var(--success)}
+.sc-trend.down{color:var(--danger)}
+
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.card-title{font-size:15px;font-weight:600}
+.card-body{padding:20px}
+
+/* ============ CHARTS ============ */
+.trend-wrap{height:220px;position:relative}
+.bar-chart{display:flex;align-items:flex-end;gap:10px;height:180px;padding-bottom:24px;border-bottom:1px solid var(--border);position:relative}
+.bar-chart .bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.bar-chart .bar{width:100%;max-width:32px;background:linear-gradient(180deg,var(--brand-light),var(--brand));border-radius:4px 4px 0 0;transition:height .6s}
+.bar-chart .bar-label{font-size:11px;color:var(--text-3)}
+.bar-chart .bar-val{font-size:11px;color:var(--text-2);font-family:monospace}
+.bar-chart .y-axis{position:absolute;left:-40px;top:0;bottom:24px;display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:var(--text-4)}
+
+/* Donut chart */
+.donut-wrap{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center}
+.donut{width:200px;height:200px;border-radius:50%;position:relative;margin:0 auto}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-radius:50%}
+.donut-center .v{font-size:24px;font-weight:700}
+.donut-center .l{font-size:11px;color:var(--text-3);margin-top:2px}
+.legend{display:flex;flex-direction:column;gap:10px}
+.legend-item{display:flex;align-items:center;gap:10px;font-size:13px}
+.legend-item .dot{width:10px;height:10px;border-radius:3px}
+.legend-item .name{flex:1;color:var(--text-2)}
+.legend-item .val{font-family:monospace;color:var(--text);font-weight:600}
+.legend-item .pct{color:var(--text-3);font-size:12px;min-width:40px;text-align:right}
+
+/* ============ PROGRESS ============ */
+.progress{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-light));border-radius:4px;transition:width .5s}
+.progress-fill.orange{background:linear-gradient(90deg,var(--warning),#FFB347)}
+.progress-fill.red{background:linear-gradient(90deg,var(--danger),#FF7875)}
+
+/* ============ BADGE ============ */
+.tag{display:inline-flex;align-items:center;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:500}
+.tag-blue{background:#E8F3FF;color:var(--brand)}
+.tag-green{background:#E8FFEA;color:var(--success)}
+.tag-orange{background:#FFF7E8;color:var(--warning)}
+.tag-red{background:#FFECE8;color:var(--danger)}
+.tag-gray{background:var(--bg);color:var(--text-3)}
+.tag-purple{background:#F5E8FF;color:var(--purple)}
+
+/* ============ DEPT TREE ============ */
+.dept-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;transition:background .15s}
+.dept-item:hover{background:var(--bg)}
+.dept-ic{font-size:14px}
+.dept-name{flex:1;font-weight:500}
+.dept-count{color:var(--text-3);font-size:12px}
+.dept-children{padding-left:24px;border-left:1px dashed var(--border);margin-left:12px}
+
+/* ============ BUTTONS ============ */
+.btn{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:#0E47D9}
+.btn-outline{background:#fff;border-color:var(--border);color:var(--text-2)}
+.btn-outline:hover{border-color:var(--brand);color:var(--brand)}
+.btn-ghost{background:transparent;color:var(--text-2)}
+.btn-ghost:hover{background:var(--bg)}
+
+/* ============ SEARCH + FILTER ============ */
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.toolbar input,.toolbar select{padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff;outline:none}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--brand)}
+.toolbar input{width:220px}
+
+/* ============ UTIL ============ */
+.hide{display:none !important}
+.mono{font-family:Menlo,Consolas,monospace}
+.text-muted{color:var(--text-3)}
+.text-brand{color:var(--brand)}
+.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}.mb-24{margin-bottom:24px}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.app{grid-template-columns:1fr}.sidebar{display:none}.grid-3,.grid-2{grid-template-columns:1fr}}
+
+/* ============ APP CARD ============ */
+.app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.app-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s}
+.app-card:hover{border-color:var(--brand);box-shadow:var(--shadow);transform:translateY(-2px)}
+.app-ic{width:48px;height:48px;background:#F2F3F5;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px}
+.app-info .n{font-weight:600;margin-bottom:4px}
+.app-info .t{color:var(--text-3);font-size:12px}
+
+/* ============ TOAST ============ */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 20px;background:#1D2129;color:#fff;border-radius:6px;font-size:13px;z-index:9999;animation:slideDown .25s}
+@keyframes slideDown{from{transform:translate(-50%,-20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginView" class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-ic">智</div>
+      <div class="logo-t">智北企业后台</div>
+    </div>
+    <p class="login-slogan">ZhiBei Enterprise Admin · 轨道交通行业数字化平台</p>
+    <div class="login-form">
+      <div class="f">
+        <label>管理员账号</label>
+        <input type="text" id="entUser" placeholder="请输入账号">
+      </div>
+      <div class="f">
+        <label>密码</label>
+        <input type="password" id="entPass" placeholder="请输入密码">
+      </div>
+      <button class="login-btn" onclick="doLogin()">登录企业后台</button>
+      <div class="login-err" id="loginErr">账号或密码错误</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="entApp" class="app" style="display:none">
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="ic">智</div>
+      <div>
+        <div class="tn">智北企业后台</div>
+        <div class="ts">ZhiBei Admin Console</div>
+      </div>
+    </div>
+
+    <div class="sb-group-title">工作台</div>
+    <div class="sb-item active" data-view="dashboard"><span class="ic">📊</span>总览仪表盘</div>
+
+    <div class="sb-group-title">组织与成员</div>
+    <div class="sb-item" data-view="departments"><span class="ic">🏢</span>部门架构</div>
+    <div class="sb-item" data-view="employees"><span class="ic">👥</span>员工管理</div>
+
+    <div class="sb-group-title">AI 管理</div>
+    <div class="sb-item" data-view="ai"><span class="ic">🤖</span>AI 模型与用量</div>
+    <div class="sb-item" data-view="finance"><span class="ic">💰</span>订阅与账单</div>
+
+    <div class="sb-group-title">应用与集成</div>
+    <div class="sb-item" data-view="apps"><span class="ic">🧩</span>应用中心</div>
+
+    <div class="sb-group-title">安全与审计</div>
+    <div class="sb-item" data-view="audit"><span class="ic">🛡️</span>审计日志</div>
+
+    <div class="sb-group-title">系统</div>
+    <div class="sb-item" onclick="doLogout()"><span class="ic">🚪</span>退出登录</div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <div class="tb-title" id="viewTitle">总览仪表盘</div>
+      <div class="tb-crumbs" id="viewCrumbs">工作台 / 仪表盘</div>
+      <div class="tb-right">
+        <input class="tb-search" placeholder="搜索菜单、成员、应用...">
+        <div class="tb-btn" title="通知">🔔<span class="dot"></span></div>
+        <div class="tb-btn" title="帮助">❓</div>
+        <div class="tb-user" onclick="doLogout()">
+          <div class="tb-avatar" id="tbAvatar">A</div>
+          <div>
+            <div class="name" id="tbName">admin</div>
+            <div class="role" id="tbRole">超级管理员</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- ================== DASHBOARD ================== -->
+      <div class="view" data-view="dashboard">
+        <div class="grid-4">
+          <div class="stat-card">
+            <div class="sc-top"><span class="sc-label">活跃员工</span><div class="sc-ic blue">👥</div></div>
+            <div class="sc-val" id="scEmpActive">-</div>
+            <div class="sc-trend up">▲ 本周新增 +3</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-top"><span class="sc-label">AI 今日调用</span><div class="sc-ic green">🤖</div></div>
+            <div class="sc-val" id="scCallsToday">-</div>
+            <div class="sc-trend up">▲ 较昨日 +12.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-top"><span class="sc-label">Token 额度</span><div class="sc-ic orange">💳</div></div>
+            <div class="sc-val" id="scQuota">-</div>
+            <div class="sc-trend down">剩余 <span id="scQuotaPct">-</span>%</div>
+          </div>
+          <div class="stat-card">
+            <div class="sc-top"><span class="sc-label">订阅到期</span><div class="sc-ic purple">📅</div></div>
+            <div class="sc-val" id="scBilling">-</div>
+            <div class="sc-trend down">E3 标准版</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">AI 调用量趋势（近 7 天）</div>
+              <div style="font-size:12px;color:var(--text-3)">单位：次 / 天</div>
+            </div>
+            <div class="card-body">
+              <div class="trend-wrap">
+                <div class="bar-chart" id="trendChart"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">AI 模型使用分布</div>
+              <div style="font-size:12px;color:var(--text-3)">近 30 天</div>
+            </div>
+            <div class="card-body">
+              <div class="donut-wrap" id="donutChart"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🎫 企业订阅信息</div>
+              <button class="btn btn-outline" onclick="goto('finance')">管理订阅</button>
+            </div>
+            <div class="card-body">
+              <table>
+                <tr><td style="color:var(--text-3);width:140px">租户 ID</td><td class="mono">F7AZLB6AD03</td></tr>
+                <tr><td style="color:var(--text-3);width:140px">企业名称</td><td>智北智能轨道交通有限公司</td></tr>
+                <tr><td style="color:var(--text-3);width:140px">当前套餐</td><td><span class="tag tag-blue">Pro Annual · E3</span></td></tr>
+                <tr><td style="color:var(--text-3);width:140px">到期时间</td><td id="planExpire">2027-04-27</td></tr>
+                <tr><td style="color:var(--text-3);width:140px">下一次计费</td><td id="nextBill">2026-10-27</td></tr>
+                <tr><td style="color:var(--text-3);width:140px">订单号</td><td class="mono">ord_918273645</td></tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🚨 最新系统告警</div>
+              <button class="btn btn-ghost">查看全部</button>
+            </div>
+            <div class="card-body" id="alertList" style="padding:0">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🏢 部门架构概览</div>
+            <span style="font-size:12px;color:var(--text-3)" id="deptSummary"></span>
+          </div>
+          <div class="card-body" id="deptTree"></div>
+        </div>
+      </div>
+
+      <!-- ================== DEPARTMENTS ================== -->
+      <div class="view" data-view="departments" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">组织架构 · Department Tree</div>
+            <div class="toolbar" style="margin:0">
+              <input placeholder="搜索部门名称...">
+              <button class="btn btn-outline">+ 新增部门</button>
+            </div>
+          </div>
+          <div class="card-body" id="deptTree2"></div>
+        </div>
+      </div>
+
+      <!-- ================== EMPLOYEES ================== -->
+      <div class="view" data-view="employees" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">员工管理</div>
+            <div class="toolbar" style="margin:0">
+              <input id="empSearch" placeholder="搜索姓名、邮箱、职位..." oninput="renderEmployees()">
+              <select id="empStatus" onchange="renderEmployees()">
+                <option value="">全部状态</option>
+                <option value="active">在职</option>
+                <option value="leave">离职</option>
+              </select>
+              <button class="btn btn-outline">+ 添加成员</button>
+              <button class="btn btn-primary">批量导入</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>姓名</th><th>职位</th><th>所属部门</th><th>邮箱</th><th>手机</th><th>状态</th><th>加入日期</th>
+                </tr>
+              </thead>
+              <tbody id="empTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================== AI ================== -->
+      <div class="view" data-view="ai" style="display:none">
+        <div class="grid-4">
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">今日调用</span><div class="sc-ic blue">⚡</div></div><div class="sc-val" id="aiCallsDay">-</div></div>
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">今日消耗 Tokens</span><div class="sc-ic purple">🔋</div></div><div class="sc-val" id="aiTokensDay">-</div></div>
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">活跃用户</span><div class="sc-ic green">👤</div></div><div class="sc-val">76</div></div>
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">API Key 数量</span><div class="sc-ic orange">🔑</div></div><div class="sc-val">12</div></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">🤖 可用 AI 模型</div></div>
+            <div class="card-body" style="padding:0">
+              <table>
+                <thead><tr><th>模型</th><th>类型</th><th>上下文</th><th>状态</th><th>近 30 天调用</th></tr></thead>
+                <tbody id="modelTable">
+                  <tr><td><strong>ZB-Large-v1</strong></td><td>对话 / 生成</td><td>8192</td><td><span class="tag tag-green">已启用</span></td><td class="mono">4,821</td></tr>
+                  <tr><td><strong>ZB-Turbo-v1</strong></td><td>极速对话</td><td>4096</td><td><span class="tag tag-green">已启用</span></td><td class="mono">2,910</td></tr>
+                  <tr><td><strong>ZB-Code-v1</strong></td><td>代码生成</td><td>16384</td><td><span class="tag tag-green">已启用</span></td><td class="mono">1,580</td></tr>
+                  <tr><td><strong>ZB-Image-v1</strong></td><td>图像生成</td><td>-</td><td><span class="tag tag-green">已启用</span></td><td class="mono">756</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">📊 Token 配额</div><span style="font-size:12px;color:var(--text-3)" id="quotaPct">-</span></div>
+            <div class="card-body">
+              <div style="margin-bottom:20px">
+                <div class="flex-between" style="margin-bottom:8px"><span style="color:var(--text-3);font-size:13px">年度总额度</span><span class="mono" id="quotaTotal">-</span></div>
+                <div class="progress"><div class="progress-fill" id="quotaBar"></div></div>
+                <div class="flex-between" style="margin-top:8px;font-size:12px;color:var(--text-3)"><span>已使用 <span id="quotaUsed" style="color:var(--text);font-weight:600">-</span></span><span>剩余 <span id="quotaLeft" style="color:var(--brand);font-weight:600">-</span></span></div>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:16px">
+                <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">近 7 天消耗明细</div>
+                <div id="quotaDaily"></div>
+              </div>
+              <button class="btn btn-primary" style="margin-top:16px;width:100%;justify-content:center" onclick="goto('finance')">升级订阅 / 充值额度</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================== FINANCE ================== -->
+      <div class="view" data-view="finance" style="display:none">
+        <div class="grid-3">
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">当前订阅</span><div class="sc-ic blue">📦</div></div><div class="sc-val">Pro Annual</div><div class="sc-trend">E3 标准版 · 年付</div></div>
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">年付金额</span><div class="sc-ic green">💰</div></div><div class="sc-val">¥999</div><div class="sc-trend up">比月付节省 ¥189</div></div>
+          <div class="stat-card"><div class="sc-top"><span class="sc-label">下次续费</span><div class="sc-ic orange">📅</div></div><div class="sc-val" id="financeNextBill">-</div><div class="sc-trend">自动扣款</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">📄 订阅历史订单</div>
+            <div class="toolbar" style="margin:0">
+              <select><option>全部类型</option><option>订阅</option><option>充值</option><option>退款</option></select>
+              <select><option>全部状态</option><option>已支付</option><option>已退款</option></select>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>订单号</th><th>商品</th><th>金额</th><th>状态</th><th>支付方式</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="orderTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================== APPS ================== -->
+      <div class="view" data-view="apps" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🧩 已安装应用</div>
+            <div class="toolbar" style="margin:0">
+              <input placeholder="搜索应用...">
+              <select><option>全部类型</option><option>AI</option><option>IM</option><option>BI</option><option>OA</option></select>
+              <button class="btn btn-primary">+ 添加应用</button>
+            </div>
+          </div>
+          <div class="card-body" id="appGrid"></div>
+        </div>
+      </div>
+
+      <!-- ================== AUDIT ================== -->
+      <div class="view" data-view="audit" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🛡️ 审计日志</div>
+            <div class="toolbar" style="margin:0">
+              <input placeholder="搜索操作人、动作...">
+              <select><option>全部严重级别</option><option>info</option><option>warning</option><option>danger</option></select>
+              <button class="btn btn-outline">导出 CSV</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>目标</th><th>级别</th></tr></thead>
+              <tbody id="auditBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ AUTH ============
+const LS_TOKEN = 'zb_ent_token';
+const LS_USER = 'zb_ent_user';
+let token = localStorage.getItem(LS_TOKEN) || '';
+
+async function api(p, method='GET', body) {
+  const hdrs = { 'Content-Type':'application/json' };
+  if (token) hdrs['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(p, { method, headers: hdrs, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) { showLogin(); return null; }
+  return r.json();
+}
+function toast(m, t='info'){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.background = t==='success'?'#00B42A':(t==='error'?'#F53F3F':'#1D2129');
+  el.textContent = m; document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2500);
+}
+
+function showLogin(){ document.getElementById('loginView').style.display=''; document.getElementById('entApp').style.display='none'; }
+function showApp(){ document.getElementById('loginView').style.display='none'; document.getElementById('entApp').style.display='grid'; }
+
+async function doLogin(){
+  const u = document.getElementById('entUser').value.trim();
+  const p = document.getElementById('entPass').value;
+  const r = await api('/api/login','POST',{username:u,password:p});
+  if (!r || r.role !== 'admin') {
+    document.getElementById('loginErr').style.display='block';
+    return;
+  }
+  token = r.token; localStorage.setItem(LS_TOKEN, token);
+  localStorage.setItem(LS_USER, JSON.stringify(r));
+  document.getElementById('loginErr').style.display='none';
+  document.getElementById('tbName').textContent = r.username;
+  document.getElementById('tbAvatar').textContent = r.username.charAt(0).toUpperCase();
+  showApp(); loadView('dashboard');
+}
+
+function doLogout(){
+  token = ''; localStorage.removeItem(LS_TOKEN); localStorage.removeItem(LS_USER);
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  showLogin(); toast('已退出登录','info');
+}
+
+// ============ ROUTING ============
+const viewMap = {
+  dashboard:{ t:'📊 总览仪表盘', c:'工作台 / 仪表盘' },
+  departments:{ t:'🏢 部门架构', c:'组织与成员 / 部门架构' },
+  employees:{ t:'👥 员工管理', c:'组织与成员 / 员工管理' },
+  ai:{ t:'🤖 AI 模型与用量', c:'AI 管理 / 模型与用量' },
+  finance:{ t:'💰 订阅与账单', c:'AI 管理 / 订阅账单' },
+  apps:{ t:'🧩 应用中心', c:'应用与集成 / 应用中心' },
+  audit:{ t:'🛡️ 审计日志', c:'安全与审计 / 审计日志' }
+};
+
+function loadView(v){
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.toggle('active', x.dataset.view===v));
+  document.getElementById('viewTitle').textContent = viewMap[v].t;
+  document.getElementById('viewCrumbs').textContent = viewMap[v].c;
+  document.querySelectorAll('.view').forEach(x=>x.style.display='none');
+  const el = document.querySelector(`.view[data-view="${v}"]`);
+  if (el) el.style.display='';
+  if (v==='dashboard') loadDashboard();
+  if (v==='departments') loadDepartments();
+  if (v==='employees') loadEmployees();
+  if (v==='ai') loadAI();
+  if (v==='finance') loadFinance();
+  if (v==='apps') loadApps();
+  if (v==='audit') loadAudit();
+}
+function goto(v){ loadView(v); document.querySelector('.sb-item[data-view="'+v+'"]')?.scrollIntoView({block:'nearest'}); }
+document.querySelectorAll('.sb-item[data-view]').forEach(el=>el.onclick=()=>loadView(el.dataset.view));
+
+// ============ DASHBOARD ============
+async function loadDashboard(){
+  const d = await api('/api/ent/dashboard'); if (!d) return;
+  document.getElementById('scEmpActive').textContent = d.active_employees + ' / ' + d.total_employees;
+  document.getElementById('scCallsToday').textContent = d.ai_calls_today.toLocaleString();
+  const pct = ((d.token_quota_used/d.token_quota_total)*100).toFixed(1);
+  document.getElementById('scQuota').textContent = (d.token_quota_used/1000000).toFixed(1) + 'M / ' + (d.token_quota_total/1000000).toFixed(0) + 'M';
+  document.getElementById('scQuotaPct').textContent = (100-pct).toFixed(1);
+  document.getElementById('scBilling').textContent = d.next_billing_date;
+  document.getElementById('planExpire').textContent = d.next_billing_date;
+  document.getElementById('nextBill').textContent = d.next_billing_date;
+  document.getElementById('deptSummary').textContent = d.departments.length + ' 个部门 · 总计 ' + d.total_employees + ' 人';
+
+  // Trend chart (bars)
+  const tc = document.getElementById('trendChart');
+  const max = Math.max(...d.ai_usage_trend.map(x=>x.calls));
+  tc.innerHTML = '<div class="y-axis"><span>'+max+'</span><span>'+(max/2)+'</span><span>0</span></div>' + d.ai_usage_trend.map(x=>{
+    const h = (x.calls/max*100);
+    const day = x.date.slice(5);
+    return '<div class="bar-group"><div class="bar-val">'+x.calls+'</div><div class="bar" style="height:'+h+'%"></div><div class="bar-label">'+day+'</div></div>';
+  }).join('');
+
+  // Donut chart
+  const colors = ['#165DFF','#00B42A','#FF7D00','#722ED1'];
+  const total = d.ai_model_distribution.reduce((a,b)=>a+b.calls,0);
+  let cum = 0, svgHtml = '';
+  d.ai_model_distribution.forEach((m,i)=>{
+    const start = cum/total*2*Math.PI - Math.PI/2, end = (cum+m.calls)/total*2*Math.PI - Math.PI/2;
+    cum += m.calls;
+    const big = m.calls/total > 0.5;
+    const x1 = 100+80*Math.cos(start), y1 = 100+80*Math.sin(start), x2 = 100+80*Math.cos(end), y2 = 100+80*Math.sin(end);
+    svgHtml += '<path d="M100,100 L'+x1+','+y1+' A80,80 0 '+big?'1':'0'+' 1 '+x2+','+y2+' Z" fill="'+colors[i]+'"></path>';
+  });
+  document.getElementById('donutChart').innerHTML =
+    '<svg class="donut" viewBox="0 0 200 200" style="width:200px;height:200px">'+svgHtml+'<circle cx="100" cy="100" r="50" fill="#fff"></circle></svg>' +
+    '<div class="donut-center"><div class="v">'+total.toLocaleString()+'</div><div class="l">30 天总调用</div></div>' +
+    '<div class="legend">' + d.ai_model_distribution.map((m,i)=>
+      '<div class="legend-item"><span class="dot" style="background:'+colors[i]+'"></span><span class="name">'+m.name+'</span><span class="val">'+m.calls.toLocaleString()+'</span><span class="pct">'+m.pct+'%</span></div>'
+    ).join('') + '</div>';
+
+  // Alert list
+  const alerts = [
+    {t:'warning', a:'AI API 调用量异常升高 · 24h 超阈值'},
+    {t:'info',    a:'Pro Annual 订阅将于 '+d.next_billing_date+' 自动续费'},
+    {t:'danger',  a:'检测到异常登录尝试 · IP 119.147.201.88'},
+    {t:'info',    a:'系统已为 10 名新员工自动开通 AI 权限'},
+    {t:'info',    a:'ZB-Large-v1 模型 v1.2.1 已发布更新'}
+  ];
+  document.getElementById('alertList').innerHTML = alerts.map(x=>{
+    const c = x.t==='warning'?'#FF7D00':(x.t==='danger'?'#F53F3F':'#165DFF');
+    const icon = x.t==='warning'?'⚠️':(x.t==='danger'?'🚨':'ℹ️');
+    return '<div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;font-size:13px">'+
+      '<span style="font-size:16px">'+icon+'</span><span style="flex:1;color:var(--text-2)">'+x.a+'</span>'+
+      '<span style="color:'+c+';font-size:12px">'+(x.t==='warning'?'警告':(x.t==='danger'?'严重':'信息'))+'</span></div>';
+  }).join('');
+
+  // Dept tree (hierarchical)
+  const roots = d.departments.filter(x=>!x.parent_id);
+  function renderNode(dept, level){
+    const kids = d.departments.filter(x=>x.parent_id===dept.id);
+    let html = '<div class="dept-item" style="padding-left:'+(level*16+12)+'px">' +
+      '<span class="dept-ic">🏢</span>' +
+      '<span class="dept-name">'+dept.name+'</span>' +
+      '<span class="tag tag-blue">'+dept.headcount+' 人</span>' +
+      '<span class="dept-count" style="margin-left:8px">负责人：'+dept.manager+'</span></div>';
+    if (kids.length) {
+      html += '<div class="dept-children">' + kids.map(k=>renderNode(k,level+1)).join('') + '</div>';
+    }
+    return html;
+  }
+  document.getElementById('deptTree').innerHTML = roots.map(x=>renderNode(x,0)).join('');
+}
+
+// ============ DEPARTMENTS ============
+async function loadDepartments(){
+  const d = await api('/api/ent/departments'); if (!d) return;
+  const roots = d.departments.filter(x=>!x.parent_id);
+  function rn(dept, level){
+    const kids = d.departments.filter(x=>x.parent_id===dept.id);
+    let html = '<div class="dept-item" style="padding-left:'+(level*16+12)+'px">'+
+      '<span class="dept-ic">🏢</span><span class="dept-name">'+dept.name+'</span>'+
+      '<span class="tag tag-blue">'+dept.headcount+' 人</span>'+
+      '<span class="dept-count" style="margin-left:auto;margin-right:12px">负责人：'+dept.manager+'</span>'+
+      '<button class="btn btn-outline">编辑</button></div>';
+    if (kids.length) html += '<div class="dept-children">'+kids.map(k=>rn(k,level+1)).join('')+'</div>';
+    return html;
+  }
+  document.getElementById('deptTree2').innerHTML = roots.map(x=>rn(x,0)).join('');
+}
+
+// ============ EMPLOYEES ============
+let empData = null;
+async function loadEmployees(){
+  const d = await api('/api/ent/employees'); if (!d) return;
+  empData = d;
+  renderEmployees();
+}
+function renderEmployees(){
+  const kw = document.getElementById('empSearch').value.toLowerCase();
+  const st = document.getElementById('empStatus').value;
+  const list = empData.employees.filter(e=>{
+    if (st && e.status !== st) return false;
+    if (kw && !(e.name.toLowerCase().includes(kw) || e.email.toLowerCase().includes(kw) || e.position.toLowerCase().includes(kw))) return false;
+    return true;
+  });
+  document.getElementById('empTableBody').innerHTML = list.map(e=>{
+    const stTag = e.status==='active' ? '<span class="tag tag-green">在职</span>' : '<span class="tag tag-gray">已离职</span>';
+    const roleTag = e.role==='super_admin' ? '<span class="tag tag-red">超级管理员</span>' : (e.role==='admin' ? '<span class="tag tag-orange">管理员</span>' : '<span class="tag tag-gray">普通成员</span>');
+    return '<tr>' +
+      '<td class="mono">'+e.id+'</td>' +
+      '<td><strong>'+e.name+'</strong></td>' +
+      '<td>'+e.position+'</td>' +
+      '<td>'+e.department+'</td>' +
+      '<td class="text-muted">'+e.email+'</td>' +
+      '<td class="mono text-muted">'+e.phone+'</td>' +
+      '<td>'+stTag+'</td>' +
+      '<td style="font-family:monospace;color:var(--text-muted)">'+e.join_date+'</td>' +
+    '</tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-3)">没有匹配的员工</td></tr>';
+}
+
+// ============ AI ============
+async function loadAI(){
+  const d = await api('/api/ent/dashboard'); if (!d) return;
+  document.getElementById('aiCallsDay').textContent = d.ai_calls_today.toLocaleString();
+  document.getElementById('aiTokensDay').textContent = (d.ai_tokens_today/1000000).toFixed(1)+'M';
+  document.getElementById('quotaTotal').textContent = (d.token_quota_total/1000000).toFixed(0) + 'M';
+  document.getElementById('quotaUsed').textContent = (d.token_quota_used/1000000).toFixed(1)+'M';
+  document.getElementById('quotaLeft').textContent = (d.token_quota_remaining/1000000).toFixed(1)+'M';
+  const pct = (d.token_quota_used/d.token_quota_total*100).toFixed(1);
+  document.getElementById('quotaBar').style.width = pct+'%';
+  document.getElementById('quotaPct').textContent = '已使用 '+pct+'%';
+  // Daily usage bar
+  const td = document.getElementById('quotaDaily');
+  const maxTok = Math.max(...d.ai_usage_trend.map(x=>x.calls))*5000;
+  td.innerHTML = '<div style="display:flex;gap:12px;align-items:flex-end;height:60px">'+
+    d.ai_usage_trend.map(x=>{
+      const h = (x.calls*5000/maxTok*100);
+      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'+
+        '<div style="font-size:10px;color:var(--text-3);font-family:monospace">'+(x.calls*5)+'K</div>'+
+        '<div style="width:100%;height:'+h+'px;background:linear-gradient(180deg,var(--brand-light),var(--brand));border-radius:3px 3px 0 0"></div>'+
+      '</div>';
+    }).join('')+'</div>'+
+    '<div style="display:flex;gap:12px;margin-top:6px">'+d.ai_usage_trend.map(x=>
+      '<div style="flex:1;font-size:10px;color:var(--text-3);text-align:center">'+x.date.slice(5)+'</div>'
+    ).join('')+'</div>';
+}
+
+// ============ FINANCE ============
+async function loadFinance(){
+  document.getElementById('financeNextBill').textContent = new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+  const orders = await api('/api/pay/admin/all-orders') || { orders:[] };
+  const paid = orders.orders.filter(o=>o.status==='paid');
+  const pending = orders.orders.filter(o=>o.status==='pending');
+  const refunded = orders.orders.filter(o=>o.status==='refunded');
+  const all = [...refunded,...pending,...paid];
+  if (all.length === 0) {
+    document.getElementById('orderTable').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-3)">暂无订单记录</td></tr>';
+    return;
+  }
+  document.getElementById('orderTable').innerHTML = all.map(o=>{
+    const stTag = o.status==='paid' ? '<span class="tag tag-green">已支付</span>' : (o.status==='refunded' ? '<span class="tag tag-gray">已退款</span>' : '<span class="tag tag-orange">待支付</span>');
+    return '<tr>' +
+      '<td class="mono text-muted">'+o.order_id+'</td>' +
+      '<td><strong>'+o.product_name+'</strong></td>' +
+      '<td style="color:var(--text);font-weight:600">¥'+o.amount+'.00</td>' +
+      '<td>'+stTag+'</td>' +
+      '<td class="text-muted">'+(o.paid_method||'-')+'</td>' +
+      '<td style="font-family:monospace;color:var(--text-muted);font-size:12px">'+(o.created_at||'').slice(0,19).replace('T',' ')+'</td>' +
+      '<td><button class="btn btn-ghost" style="font-size:12px;color:var(--brand)">查看</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ============ APPS ============
+async function loadApps(){
+  const d = await api('/api/ent/apps'); if (!d) return;
+  document.getElementById('appGrid').innerHTML = d.apps.map(a=>{
+    const on = a.status==='enabled';
+    return '<div class="app-card">' +
+      '<div class="app-ic">'+a.icon+'</div>' +
+      '<div class="app-info" style="flex:1">' +
+        '<div class="n">'+a.name+'</div>' +
+        '<div class="t">'+a.type+' · '+(on?'已启用':'已禁用')+' · '+a.users+' 人使用</div>' +
+      '</div>' +
+      '<span class="tag '+(on?'tag-green':'tag-gray')+'">'+(on?'ON':'OFF')+'</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ============ AUDIT ============
+async function loadAudit(){
+  const d = await api('/api/ent/audit-logs'); if (!d) return;
+  document.getElementById('auditBody').innerHTML = d.logs.map(l=>{
+    const sev = l.severity==='warning' ? '<span class="tag tag-orange">警告</span>' : (l.severity==='danger' ? '<span class="tag tag-red">严重</span>' : '<span class="tag tag-blue">信息</span>');
+    return '<tr>' +
+      '<td style="font-family:monospace;color:var(--text-muted);font-size:12px">'+(l.time||'').slice(0,19).replace('T',' ')+'</td>' +
+      '<td><strong>'+l.actor+'</strong></td>' +
+      '<td>'+l.action+'</td>' +
+      '<td class="text-muted">'+l.target+'</td>' +
+      '<td>'+sev+'</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ============ BOOT ============
+const savedUser = localStorage.getItem(LS_USER);
+if (token && savedUser) {
+  try {
+    const u = JSON.parse(savedUser);
+    document.getElementById('tbName').textContent = u.username;
+    document.getElementById('tbAvatar').textContent = u.username.charAt(0).toUpperCase();
+    showApp(); loadView('dashboard');
+  } catch { showLogin(); }
+} else { showLogin(); }
+</script>
+</body>
+</html>
