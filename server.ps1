@@ -1,4 +1,4 @@
-﻿﻿# ============================================
+﻿# ============================================
 # ZhiBei Tech AI API Server v3
 # Features: Auth, Sessions, Image Gen, Admin
 # Zero Chinese literals - UTF-8 BOM required
@@ -23,9 +23,80 @@ $WB_APP_FILE  = Join-Path $STORAGE_DIR "WB_APPS.json"
 $RAIL_CAT_FILE = Join-Path $STORAGE_DIR "RAIL_CATALOG.json"
 $RAIL_PROG_FILE= Join-Path $STORAGE_DIR "RAIL_PROGRESS.json"
 $RAIL_CODE_FILE= Join-Path $STORAGE_DIR "RAIL_CODES.json"
+$CODE_TPL_FILE= Join-Path $STORAGE_DIR "CODE_TEMPLATES.json"
+$CODE_HIST_FILE= Join-Path $STORAGE_DIR "CODE_HISTORY.json"
+$RAIL_ORDERS_FILE = Join-Path $STORAGE_DIR "RAIL_ORDERS.json"
+$ZB_WALLET_FILE = Join-Path $STORAGE_DIR "ZB_WALLET.json"
+$RAIL_VIDEO_META_FILE = Join-Path $STORAGE_DIR "RAIL_VIDEO_META.json"
+$SCRIPT_ROOT  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JWT_SECRET  = "zb-secret-2026-zhibei-tech-inner"
 $ADMIN_USER  = "admin"
 $ADMIN_PASS  = "CSFXlhy14"
+
+# -------- Auth Code Storage (Mock SMS/Email) --------
+$script:SMS_CODES  = @{}    # @{ "+8613800138000" = @{ code="123456"; expire=[datetime]; attempts=0 } }
+$script:EMAIL_CODES = @{}   # same structure
+$script:bankRevealTokens = @{}   # 银行卡号查看临时 token（{user.sub = @{ token; expires; used } }）
+$script:bankRevealLastCall = @{} # 限流
+$script:CODE_RATE   = @{}   # @{ "192.168.1.1" = @{ last_send=[datetime]; count_per_day=0 } }
+
+function New-6DigitCode {
+    $r = New-Object System.Random
+    return $r.Next(100000, 999999).ToString()
+}
+function Add-PhoneCode([string]$Phone,[string]$Code,[int]$ValidMinutes=5) {
+    $script:SMS_CODES[$Phone] = [pscustomobject]@{ code=$Code; expire=(Get-Date).AddMinutes($ValidMinutes); attempts=0; sent_at=(Get-Date) }
+}
+function Add-EmailCode([string]$Email,[string]$Code,[int]$ValidMinutes=5) {
+    $script:EMAIL_CODES[$Email.ToLower()] = [pscustomobject]@{ code=$Code; expire=(Get-Date).AddMinutes($ValidMinutes); attempts=0; sent_at=(Get-Date) }
+}
+function Test-PhoneCode([string]$Phone,[string]$Code) {
+    if (-not $script:SMS_CODES.ContainsKey($Phone)) { return $false }
+    $e = $script:SMS_CODES[$Phone]
+    if ((Get-Date) -gt $e.expire) { $script:SMS_CODES.Remove($Phone); return $false }
+    $e.attempts++
+    if ($e.attempts -gt 5) { return $false }
+    return ($e.code -eq $Code)
+}
+function Test-EmailCode([string]$Email,[string]$Code) {
+    $k = $Email.ToLower()
+    if (-not $script:EMAIL_CODES.ContainsKey($k)) { return $false }
+    $e = $script:EMAIL_CODES[$k]
+    if ((Get-Date) -gt $e.expire) { $script:EMAIL_CODES.Remove($k); return $false }
+    $e.attempts++
+    if ($e.attempts -gt 5) { return $false }
+    return ($e.code -eq $Code)
+}
+
+# -------- Validation Helpers --------
+function Test-PhoneCN([string]$Phone) {
+    if ([string]::IsNullOrWhiteSpace($Phone)) { return $false }
+    $p = $Phone -replace '[\s\-\+]',''
+    return ($p -match '^1[3-9]\d{9}$')
+}
+function Test-EmailCN([string]$Email) {
+    if ([string]::IsNullOrWhiteSpace($Email)) { return $false }
+    return ($Email -match '^[\w\.\-]+@[\w\.\-]+\.[a-zA-Z]{2,}$')
+}
+function Test-IDCardCN([string]$IdCard) {
+    if ([string]::IsNullOrWhiteSpace($IdCard)) { return $false }
+    $v = $IdCard -replace '\s',''
+    return ($v -match '^\d{17}[\dXx]$')
+}
+function Get-PasswordStrength([string]$Pw) {
+    # 0=极弱 1=弱 2=中 3=强 4=极强
+    $score = 0
+    if ($Pw.Length -ge 8) { $score++ }
+    if ($Pw.Length -ge 12) { $score++ }
+    if ($Pw -match '[A-Z]' -and $Pw -match '[a-z]') { $score++ }
+    if ($Pw -match '\d') { $score++ }
+    if ($Pw -match '[^\w\s]') { $score++ }
+    return [Math]::Min(4, [Math]::Max(0, $score))
+}
+function Get-PasswordStrengthLabel([int]$Score) {
+    $labels = @('极弱','弱','中等','强','极强')
+    return $labels[$Score]
+}
 
 # Ensure storage dirs
 if (-not (Test-Path $STORAGE_DIR)) { New-Item -ItemType Directory -Path $STORAGE_DIR -Force | Out-Null }
@@ -143,55 +214,11 @@ if (-not (Test-Path $WB_APP_FILE)) {
     )} | ConvertTo-Json -Depth 10 | Out-File -FilePath $WB_APP_FILE -Encoding utf8
 }
 
-# -------- Rail Academy Seed (20 units × 10 parts × 10 lessons = 2000) --------
+# -------- Rail Academy Catalog --------
+# 真实课程目录由 gen_rail_catalog.py 生成（见 data/RAIL_CATALOG.json）
+# 不再自动用模板生成——如需重置，请运行 gen_rail_catalog.py
 if (-not (Test-Path $RAIL_CAT_FILE)) {
-    $railUnits = @(
-        "轨道交通概览与发展历程","城市地铁系统基础架构","轻轨与有轨电车技术",
-        "高铁动车组原理与结构","轨道信号与列控系统（CBTC）","车站设计与换乘枢纽",
-        "牵引供电系统（接触网/第三轨）","车辆机械结构与车体","转向架与轮对技术",
-        "制动系统原理","空调与内饰设计","通信与乘客信息系统（PIS）",
-        "屏蔽门与安全门系统","轨道交通车辆制造工艺","车辆运营与调度管理",
-        "轨道工程与道岔技术","电力系统与变电所","城市轨道交通投融资与运营",
-        "智能运维与预测性维护","智北 AI 在轨道交通中的应用"
-    )
-    $partNames = @("入门导引","核心概念","系统架构","关键技术","实战案例","进阶原理","对比分析","常见问题","行业趋势","单元总结")
-    $partIcons = @("🌱","📘","🏗️","⚙️","🛠️","🔬","⚖️","❓","📈","✅")
-    $lessonVerbs = @("认识","理解","掌握","分析","对比","设计","调试","优化","评估","总结")
-    $lessonNouns = @("概念","原理","架构","接口","流程","部件","算法","规范","案例","体系")
-    $unitsOut = @()
-    for($u=0;$u -lt 20;$u++){
-        $uid = "u$($u+1)"; $uName = $railUnits[$u]
-        $isFree = ($u -eq 0)  # 第 1 单元全部免费
-        $partsOut = @()
-        for($p=0;$p -lt 10;$p++){
-            $partId = "$($uid)p$($p+1)"; $pName = $partNames[$p]
-            $lessonsOut = @()
-            for($l=0;$l -lt 10;$l++){
-                $lid = "$($partId)l$($l+1)"
-                $title = "$($lessonVerbs[$l])$($lessonNouns[$l])：$($pName)之$($lessonVerbs[$l])$($lessonNouns[$l])"
-                $lessonsOut += [pscustomobject]@{
-                    id=$lid; no=($l+1)
-                    title=$title
-                    duration=110+($u*3+($p*$l)%25)  # ~2min with variation
-                    free=$isFree  # 第 1 单元全部免费
-                    doc_markdown=("### $title`n`n**所属**：第 $($u+1) 单元 · 第 $($p+1) 部分`n`n#### 一、学习目标`n在本小结中，我们将围绕「$($uName)」主题下的「$($pName)」模块，系统讲解其核心知识与实践要点。通过视频 + 配套文档的双轨学习，你将建立完整的知识体系。`n`n#### 二、核心内容`n1. 基本定义与概念边界`n2. 工作原理与机制剖析`n3. 典型应用场景与案例`n4. 常见误区与正确姿势`n`n#### 三、学习建议`n- 建议先完整观看视频一遍，再阅读文档做笔记`n- 关键技术点可以暂停回看，配合示意图解加深理解`n- 如遇疑问，可在评论区留言或在智北工作台 AI 助手处提问`n`n#### 四、延伸阅读`n- 行业标准与规范（GB、TB 系列）`n- 相关国际学术论文与会议报告`n- 智北科技公开技术白皮书")
-                }
-            }
-            $partsOut += [pscustomobject]@{
-                id=$partId; no=($p+1); name=$pName; icon=$partIcons[$p]
-                lessons=$lessonsOut; total=10
-            }
-        }
-        $unitsOut += [pscustomobject]@{
-            id=$uid; no=($u+1); name=$uName; icon=@("🚆","🚇","🚉","🚄","📡","🏛️","⚡","🚋","🔧","🛑","❄️","📣","🚪","🏭","🗺️","🛤️","🔋","💰","🔍","🤖")[$u]
-            free=$isFree; tag=if($isFree){"全部免费"}else{"¥89/单元"}
-            parts=$partsOut; total_parts=10; total_lessons=100
-        }
-    }
-    @{
-        meta=@{version="1.0"; generated=(Get-Date).ToString("o"); units=20; parts_per_unit=10; lessons_per_part=10; price_lesson=1; price_part=9; price_unit=89; free_unit=1}
-        units=$unitsOut
-    } | ConvertTo-Json -Depth 8 | Out-File -FilePath $RAIL_CAT_FILE -Encoding utf8
+    Write-Host "  [!] RAIL_CATALOG.json not found — run gen_rail_catalog.py to generate" -ForegroundColor Yellow
 }
 # Default all users start with free_unit unlocked + admin has everything
 if (-not (Test-Path $RAIL_PROG_FILE)) {
@@ -248,6 +275,75 @@ if (-not (Test-Path $RAIL_CODE_FILE)) {
     } | ConvertTo-Json -Depth 6 | Out-File -FilePath $RAIL_CODE_FILE -Encoding utf8
 }
 
+# -------- Code Templates (种子数据) --------
+if (-not (Test-Path $CODE_TPL_FILE)) {
+    @{ templates=@(
+        @{ id="tpl_py_hello"; name="Hello World"; language="python"; description="最简 Python 入门"; category="入门"; code="print('Hello ZhiBei!')" },
+        @{ id="tpl_py_fib";   name="斐波那契"; language="python"; description="计算前 N 项斐波那契数列"; category="算法"; code="def fib(n):`n    a, b = 0, 1`n    for _ in range(n):`n        a, b = b, a + b`n    return a`n`nprint([fib(i) for i in range(10)])" },
+        @{ id="tpl_ps_sys";   name="系统信息"; language="powershell"; description="PowerShell 打印系统概要"; category="系统"; code="Get-ComputerInfo | Select-Object CsName, OsName, OsVersion, CsTotalPhysicalMemory | Format-List" },
+        @{ id="tpl_ps_net";   name="端口扫描"; language="powershell"; description="列出本机监听端口"; category="网络"; code="Get-NetTCPConnection -State Listen | Select-Object LocalPort,OwningProcess | Sort-Object LocalPort | Format-Table -AutoSize" },
+        @{ id="tpl_js_arr";   name="数组去重"; language="javascript"; description="JS 数组去重 + 排序"; category="工具"; code="const arr = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5];`nconsole.log([...new Set(arr)].sort((a,b)=>a-b));" },
+        @{ id="tpl_sql_pivot";name="SQL 分组统计"; language="sql"; description="GROUP BY 聚合示例"; category="数据库"; code="SELECT department, COUNT(*) AS emp_count, AVG(salary) AS avg_salary`nFROM employees`nWHERE status = 'active'`nGROUP BY department`nORDER BY emp_count DESC;" }
+    ) } | ConvertTo-Json -Depth 8 | Out-File -FilePath $CODE_TPL_FILE -Encoding utf8
+}
+if (-not (Test-Path $CODE_HIST_FILE)) {
+    @{ history=@() } | ConvertTo-Json -Depth 10 | Out-File -FilePath $CODE_HIST_FILE -Encoding utf8
+}
+if (-not (Test-Path $RAIL_ORDERS_FILE)) {
+    @{ orders=@() } | ConvertTo-Json -Depth 10 | Out-File -FilePath $RAIL_ORDERS_FILE -Encoding utf8
+}
+if (-not (Test-Path $ZB_WALLET_FILE)) {
+    @{ wallets=@{} } | ConvertTo-Json -Depth 6 | Out-File -FilePath $ZB_WALLET_FILE -Encoding utf8
+}
+if (-not (Test-Path $RAIL_VIDEO_META_FILE)) {
+    @{} | ConvertTo-Json | Out-File -FilePath $RAIL_VIDEO_META_FILE -Encoding utf8
+}
+
+# -------- Rail Pay Methods (6 types) --------
+$RAIL_PAY_METHODS = @(
+    [pscustomobject]@{ id="alipay"; label="支付宝"; icon="💙"; desc="扫码 / 跳转支付宝 APP"; zbdeposit=$false; needs_qr=$true },
+    [pscustomobject]@{ id="wechat"; label="微信支付"; icon="💚"; desc="扫码 / 跳转微信"; zbdeposit=$false; needs_qr=$true },
+    [pscustomobject]@{ id="bank"; label="银行卡"; icon="💳"; desc="支持 ZBpay 充值（Visa / Mastercard / UnionPay）"; zbdeposit=$true; needs_qr=$true },
+    [pscustomobject]@{ id="zbpay"; label="ZBpay 余额"; icon="🟣"; desc="平台内充值余额支付，最便捷"; zbdeposit=$false; needs_qr=$false },
+    [pscustomobject]@{ id="google"; label="Google Pay"; icon="🟡"; desc="支持 ZBpay 充值（Android / Chrome）"; zbdeposit=$true; needs_qr=$false },
+    [pscustomobject]@{ id="apple"; label="Apple Pay"; icon="⚫"; desc="支持 ZBpay 充值（iPhone / Safari）"; zbdeposit=$true; needs_qr=$false }
+)
+# RAIL pay pricing (mirrors seed codes)
+$RAIL_PRICE_MAP = @{
+    unit   = 89   # 元
+    part   = 9
+    lesson = 1
+}
+
+# -------- 收款银行卡（统一收款账户） --------
+$PAYEE_BANK = [pscustomobject]@{
+    bank_name    = "中国工商银行"
+    account_name = "智北科技"
+    account_no   = "621700386183092"
+    swift        = "ICBKCNBJ"
+}
+
+# 银行卡号掩码：前4 + **** + 后4（19位/16位通用）
+function Get-MaskedBank([string]$no) {
+    if ([string]::IsNullOrWhiteSpace($no)) { return "" }
+    $clean = ($no -replace '\s', '')
+    if ($clean.Length -le 8) { return $clean }
+    $prefix = $clean.Substring(0, 4)
+    $suffix = $clean.Substring($clean.Length - 4, 4)
+    $maskLen = $clean.Length - 8
+    $mask = ('*' * [Math]::Min($maskLen, 8))
+    return "$prefix $mask $suffix"
+}
+function Get-PayeeBankMasked {
+    [pscustomobject]@{
+        bank_name    = $PAYEE_BANK.bank_name
+        account_name = $PAYEE_BANK.account_name
+        account_no   = (Get-MaskedBank $PAYEE_BANK.account_no)
+        swift        = $PAYEE_BANK.swift
+        masked       = $true
+    }
+}
+
 # -------- Payment Products (ZBpay) --------
 $PAY_PRODUCTS = @(
     @{ id="dev_monthly";  name="Developer Monthly";  amount=0;    quota=1000000;  interval="monthly"; tag="免费";    desc="1M tokens / 月，个人开发者首选" },
@@ -283,6 +379,14 @@ function Send-Json {
     $hb = [System.Text.Encoding]::ASCII.GetBytes($h)
     $Stream.Write($hb,0,$hb.Length); $Stream.Write($body,0,$body.Length); $Stream.Flush()
 }
+function Send-JsonRaw {
+    param([System.Net.Sockets.NetworkStream]$Stream,[string]$RawText,[int]$StatusCode=200)
+    $body = [System.Text.Encoding]::UTF8.GetBytes($RawText)
+    $st = switch ($StatusCode) { 200 {"OK"}; 201 {"Created"}; 400 {"Bad Request"}; 500 {"Internal"}; default {"Unknown"} }
+    $h = ("HTTP/1.1 $StatusCode $st","Content-Type: application/json; charset=utf-8","Content-Length: $($body.Length)","Access-Control-Allow-Origin: *","Connection: close","","") -join "`r`n"
+    $hb = [System.Text.Encoding]::ASCII.GetBytes($h)
+    $Stream.Write($hb,0,$hb.Length); $Stream.Write($body,0,$body.Length); $Stream.Flush()
+}
 function Send-File {
     param([System.Net.Sockets.NetworkStream]$Stream,[string]$FilePath)
     if (-not (Test-Path $FilePath -PathType Leaf)) { return $false }
@@ -311,7 +415,7 @@ function Load-UserByName([string]$Name) {
 function Save-Session([string]$Username,[object]$Session) {
     $file = Join-Path $SESS_DIR "$Username.json"
     $existing = @()
-    if (Test-Path $file) { $existing = (Get-Content $file -Raw | ConvertFrom-Json) }
+    if (Test-Path $file) { $existing = @((Get-Content $file -Raw | ConvertFrom-Json)) }
     # Replace if same id exists, else append
     $idx = -1; for ($i=0;$i -lt $existing.Count;$i++) { if ($existing[$i].id -eq $Session.id) { $idx=$i; break } }
     if ($idx -ge 0) { $existing[$idx] = $Session } else { $existing += $Session }
@@ -478,8 +582,7 @@ function New-SvgImage([string]$Prompt) {
         $so = [Math]::Round((Get-Random -Min 20 -Max 80)/100.0,2)
         $svgPieces += "<circle cx='$sx' cy='$sy' r='$sr' fill='$sc' opacity='$so' filter='url(#blur)'/>"
     }
-    # Prompt text overlay
-    $shortPrompt = if ($Prompt.Length -gt 40) { $Prompt.Substring(0,37) + "..." } else { $Prompt }
+    # Prompt text overlayif ($Prompt.Length -gt 40) { $shortPrompt = $Prompt.Substring(0,37) + "..." } else { $shortPrompt = $Prompt }
     $shortPrompt = [System.Net.WebUtility]::HtmlEncode($shortPrompt)
     $svgPieces += "<rect x='20' y='$($h-80)' width='$($w-40)' height='60' rx='12' fill='rgba(0,0,0,0.6)'/>"
     $svgPieces += "<text x='40' y='$($h-42)' font-family='monospace' font-size='18' fill='#fff'>$shortPrompt</text>"
@@ -571,6 +674,227 @@ function Redeem-RailCode([string]$Code,[string]$User){
     return $null
 }
 
+# -------- Rail Orders Helpers --------
+function Get-Price([string]$Kind) {
+    if ($RAIL_PRICE_MAP.ContainsKey($Kind)) { return $RAIL_PRICE_MAP[$Kind] }
+    return 0
+}
+function Load-RailOrders {
+    if (-not (Test-Path $RAIL_ORDERS_FILE)) { return [pscustomobject]@{ orders=@() } }
+    return Get-Content $RAIL_ORDERS_FILE -Raw | ConvertFrom-Json
+}
+function Save-RailOrders([object]$Data) {
+    $Data | ConvertTo-Json -Depth 10 | Out-File -FilePath $RAIL_ORDERS_FILE -Encoding utf8
+}
+function New-OrderId {
+    $rand = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$(Get-Date).ToString('o')-$((Get-Random)))"))).Replace("-","").Substring(0,16).ToUpper()
+    return "ZO-$rand"
+}
+function Load-ZbWallet {
+    if (-not (Test-Path $ZB_WALLET_FILE)) { return [pscustomobject]@{ wallets=@{} } }
+    return Get-Content $ZB_WALLET_FILE -Raw | ConvertFrom-Json
+}
+function Save-ZbWallet([object]$Data) {
+    $Data | ConvertTo-Json -Depth 6 | Out-File -FilePath $ZB_WALLET_FILE -Encoding utf8
+}
+function Get-ZbBalance([string]$User) {
+    $w = Load-ZbWallet
+    if (-not $w.wallets.PSObject.Properties[$User]) { return 0 }
+    return [double]$w.wallets.$User.balance
+}
+function Add-ZbBalance([string]$User,[double]$Amount,[string]$Ref) {
+    $w = Load-ZbWallet
+    if (-not $w.wallets.PSObject.Properties[$User]) {
+        $w.wallets | Add-Member -NotePropertyName $User -NotePropertyValue ([pscustomobject]@{ balance=0; transactions=@() })
+    }
+    $w.wallets.$User.balance = [double]$w.wallets.$User.balance + $Amount
+    $tx = [pscustomobject]@{ id="t_$(Get-Random -Min 100000 -Max 999999)"; type="deposit"; amount=$Amount; ref=$Ref; at=(Get-Date).ToString("o") }
+    $w.wallets.$User.transactions = @($tx) + @($w.wallets.$User.transactions | Select-Object -First 49)
+    Save-ZbWallet $w
+}
+function Deduct-ZbBalance([string]$User,[double]$Amount,[string]$Ref) {
+    $w = Load-ZbWallet
+    if (-not $w.wallets.PSObject.Properties[$User]) { return $false }
+    if ([double]$w.wallets.$User.balance -lt $Amount) { return $false }
+    $w.wallets.$User.balance = [double]$w.wallets.$User.balance - $Amount
+    $tx = [pscustomobject]@{ id="t_$(Get-Random -Min 100000 -Max 999999)"; type="spend"; amount=$Amount; ref=$Ref; at=(Get-Date).ToString("o") }
+    $w.wallets.$User.transactions = @($tx) + @($w.wallets.$User.transactions | Select-Object -First 49)
+    Save-ZbWallet $w
+    return $true
+}
+function New-QrDataUrl([string]$Text, [string]$Label = "") {
+    # 生成伪随机 QR SVG（基于 Text hash 可复现，PS5 兼容，无减法风险）
+    [int]$gs = 25     # grid size
+    [int]$cs = 8      # cell size (px)
+    [int]$gs_x_cs = $gs * $cs
+    [int]$corner_pos = $gs - 7   # 右上/左下定位方块的 x 或 y（提前算好，避免内联减法）
+    [int]$corner_pos2 = $gs - 6  # 右下角小定位内白块
+
+    # hash
+    [int]$hash = 0
+    foreach($c in $Text.ToCharArray()) {
+        $hash = ($hash * 31 + [int][char]$c) % 99991
+    }
+
+    # SVG 头
+    $svg = "<svg xmlns='http://www.w3.org/2000/svg' width='$gs_x_cs' height='$gs_x_cs' viewBox='0 0 $gs_x_cs $gs_x_cs'>"
+    $svg += "<rect width='100%' height='100%' fill='white'/>"
+
+    # 随机填充（基于 hash 伪随机）
+    [int]$rng = $hash
+    $pts = @()
+    for($y=0; $y -lt $gs; $y++){
+        for($x=0; $x -lt $gs; $x++){
+            $rng = ($rng * 1103515245 + 12345) % 2147483648
+            if(($rng -band 1) -eq 1) { $pts += @($x,$y) }
+        }
+    }
+
+    for($i=0; $i -lt $pts.Count; $i+=2){
+        $svg += "<rect x='$($pts[$i]*$cs)' y='$($pts[$i+1]*$cs)' width='$cs' height='$cs' fill='#1D2129'/>"
+    }
+
+    # 三个定位方块（左上 0,0 / 右上 corner_pos,0 / 左下 0,corner_pos）
+    $anchors = @(@(0,0), @($corner_pos,0), @(0,$corner_pos))
+    foreach($anchor in $anchors){
+        [int]$ax = $anchor[0] * $cs
+        [int]$ay = $anchor[1] * $cs
+        $svg += "<rect x='$ax' y='$ay' width='$($cs*7)' height='$($cs*7)' fill='#1D2129'/>"
+        $svg += "<rect x='$($ax+$cs)' y='$($ay+$cs)' width='$($cs*5)' height='$($cs*5)' fill='white'/>"
+        $svg += "<rect x='$($ax+$cs*2)' y='$($ay+$cs*2)' width='$($cs*3)' height='$($cs*3)' fill='#1D2129'/>"
+    }
+
+    # 右下角小定位方块
+    [int]$corner_big = $corner_pos * $cs
+    [int]$corner_white = $corner_pos2 * $cs
+    $svg += "<rect x='$corner_big' y='$corner_big' width='$($cs*5)' height='$($cs*5)' fill='#1D2129'/>"
+    $svg += "<rect x='$corner_white' y='$corner_white' width='$($cs*3)' height='$($cs*3)' fill='white'/>"
+
+    # 标签
+    if($Label -ne ""){
+        [int]$half = $gs_x_cs / 2
+        [int]$bottom = $gs_x_cs + 14
+        $svg += "<text x='$half' y='$bottom' font-size='10' text-anchor='middle' fill='#86909C' font-family='monospace'>$Label</text>"
+    }
+    $svg += "</svg>"
+    return "data:image/svg+xml;utf8," + [System.Uri]::EscapeDataString($svg)
+}
+function New-AlipayQr([string]$OrderId, [double]$Amount, [string]$Note="轨道科普") {
+    # 支付宝收款协议（展示给扫码识别用）
+    $link = "alipays://platformapi/startapp?appId=20000056&action=qrcode&bizData=" + [System.Uri]::EscapeDataString("amount=$Amount&orderId=$OrderId&note=$Note")
+    return New-QrDataUrl $link "alipay-$OrderId"
+}
+function New-WechatQr([string]$OrderId, [double]$Amount, [string]$Note="轨道科普") {
+    # 微信收款协议
+    $link = "weixin://wxpay/bizpayurl?pr=" + $OrderId + "&amount=$Amount&desc=$Note"
+    return New-QrDataUrl $link "wechat-$OrderId"
+}
+function New-BankTransferQr([string]$OrderId, [double]$Amount) {
+    $link = "ZBBANK://transfer?order=$OrderId&amount=$Amount"
+    return New-QrDataUrl $link "bank-$OrderId"
+}
+function Complete-RailOrder([string]$OrderId,[string]$PayMethod,[string]$TransactionId,[string]$User) {
+    $orders = Load-RailOrders
+    foreach($o in @($orders.orders)) {
+        if ($o.order_id -eq $OrderId -and $o.username -eq $User) {
+            if ($o.status -ne "pending") { return "订单已处理" }
+            $o.status = "paid"
+            $o.pay_method = $PayMethod
+            $o.paid_at = (Get-Date).ToString("o")
+            if (-not $TransactionId) { $TransactionId = "MOCK-$(Get-Random -Min 1000000 -Max 9999999)" }
+            $o.transaction_id = $TransactionId
+            # 自动解锁
+            $price = [int]$o.amount
+            switch($o.kind) {
+                "unit"   { Save-RailUnlock -User $User -Kind "unit"   -Key ([int]$o.target_id.Substring(1)) -Price $price }
+                "part"   { Save-RailUnlock -User $User -Kind "part"   -Key $o.target_id -Price $price }
+                "lesson" { Save-RailUnlock -User $User -Kind "lesson" -Key $o.target_id -Price $price }
+                default  { return "订单 kind 无效" }
+            }
+            Save-RailOrders $orders
+            return $null
+        }
+    }
+    return "订单不存在或非本人订单"
+}
+
+# -------- Code Admin Helpers --------
+function Load-CodeTemplates {
+    if (-not (Test-Path $CODE_TPL_FILE)) { return [pscustomobject]@{ templates=@() } }
+    return Get-Content $CODE_TPL_FILE -Raw | ConvertFrom-Json
+}
+function Save-CodeTemplates([object]$Data) {
+    $Data | ConvertTo-Json -Depth 10 | Out-File -FilePath $CODE_TPL_FILE -Encoding utf8
+}
+function Load-CodeHistory {
+    if (-not (Test-Path $CODE_HIST_FILE)) { return [pscustomobject]@{ history=@() } }
+    return Get-Content $CODE_HIST_FILE -Raw | ConvertFrom-Json
+}
+function Save-CodeHistory([object]$Data) {
+    $Data | ConvertTo-Json -Depth 10 | Out-File -FilePath $CODE_HIST_FILE -Encoding utf8
+}
+function Add-CodeHistory([string]$User,[string]$Language,[string]$Prompt,[string]$Code,[string]$Endpoint) {
+    try {
+        $d = Load-CodeHistory
+        $d.history = @($d.history)
+        if ($Prompt.Length -gt 500) { $promptShort = $Prompt.Substring(0,500) + "..." } else { $promptShort = $Prompt }
+        $entry = [pscustomobject]@{
+            id = "ch_$(Get-Random -Min 100000 -Max 999999)"
+            user = $User; language = $Language; endpoint = $Endpoint
+            prompt = $promptShort
+            code_len = $Code.Length
+            created_at = (Get-Date).ToString("o")
+        }
+        $d.history = @($entry) + @($d.history | Select-Object -First 999)
+        Save-CodeHistory $d
+    } catch { }  # best-effort, never fail the main endpoint
+}
+function Invoke-CodeSandbox([string]$Language,[string]$Code,[int]$TimeoutSec=15) {
+    $elapsed = 0; $exit = -1; $out = ""; $errMsg = ""
+    try {
+        $lang = ($Language.Trim()).ToLower()
+        if ($lang -eq "powershell") {
+            $tmp = [System.IO.Path]::GetTempFileName() + ".ps1"
+            [IO.File]::WriteAllText($tmp, $Code, [Text.Encoding]::UTF8)
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $out = & powershell -ExecutionPolicy Bypass -NoProfile -File $tmp 2>&1 | Out-String
+            $sw.Stop(); $elapsed = [int]$sw.ElapsedMilliseconds
+            $exit = 0
+            Remove-Item $tmp -Force -EA SilentlyContinue
+        } elseif ($lang -eq "python") {
+            $py = Get-Command python -EA SilentlyContinue
+            if (-not $py) { $py = Get-Command python3 -EA SilentlyContinue }
+            if (-not $py) { $errMsg = "python.exe not found"; $elapsed = 0 }
+            else {
+                $tmp = [System.IO.Path]::GetTempFileName() + ".py"
+                [IO.File]::WriteAllText($tmp, $Code, [Text.Encoding]::UTF8)
+                $sw = [Diagnostics.Stopwatch]::StartNew()
+                $out = & $py.Source $tmp 2>&1 | Out-String
+                $sw.Stop(); $elapsed = [int]$sw.ElapsedMilliseconds
+                $exit = $LASTEXITCODE
+                Remove-Item $tmp -Force -EA SilentlyContinue
+            }
+        } elseif ($lang -eq "javascript" -or $lang -eq "node") {
+            $node = Get-Command node -EA SilentlyContinue
+            if (-not $node) { $errMsg = "node.exe not found"; $elapsed = 0 }
+            else {
+                $tmp = [System.IO.Path]::GetTempFileName() + ".js"
+                [IO.File]::WriteAllText($tmp, $Code, [Text.Encoding]::UTF8)
+                $sw = [Diagnostics.Stopwatch]::StartNew()
+                $out = & $node.Source $tmp 2>&1 | Out-String
+                $sw.Stop(); $elapsed = [int]$sw.ElapsedMilliseconds
+                $exit = $LASTEXITCODE
+                Remove-Item $tmp -Force -EA SilentlyContinue
+            }
+        } else {
+            $errMsg = "unsupported language: $Language"
+        }
+    } catch {
+        $errMsg = $_.Exception.Message; $exit = -2
+    }
+    return [pscustomobject]@{ exit_code=$exit; stdout=$out; stderr=$errMsg; elapsed_ms=$elapsed }
+}
+
 # -------- API Handler --------
 function Handle-API {
     param([string]$Path,[string]$Method,[string]$Body,[string]$AuthHeader,[System.Net.Sockets.NetworkStream]$Stream)
@@ -603,43 +927,195 @@ function Handle-API {
         }; return $true
     }
 
-    # --- Auth endpoints ---
-    if ($Path -eq "/api/register" -and $Method -eq "POST") {
+    # --- Auth endpoints (Enhanced v2) ---
+
+    # --- Send SMS / Email verification codes (MOCK - code returned in response) ---
+    if ($Path -eq "/api/send-sms-code" -and $Method -eq "POST") {
         try {
             $req = $Body | ConvertFrom-Json
-            $un = [string]$req.username; $pw = [string]$req.password; $em = if ($req.email) { [string]$req.email } else { "" }
-            if ([string]::IsNullOrWhiteSpace($un) -or [string]::IsNullOrWhiteSpace($pw)) { Send-Error $Stream 400 "username and password required"; return $true }
-            if ($un.Length -lt 3) { Send-Error $Stream 400 "username min 3 chars"; return $true }
-            if ($pw.Length -lt 6) { Send-Error $Stream 400 "password min 6 chars"; return $true }
-            $existing = Load-UserByName $un
-            if ($existing) { Send-Error $Stream 400 "username already exists"; return $true }
-            $hash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($pw))).Replace("-","")
-            $users = Load-Users
-            $users += [pscustomobject]@{
-                username=$un; password_hash=$hash; role="user"; email=$em;
-                created_at=(Get-Date).ToString("o"); api_key="zb-$(Get-Random -Min 100000 -Max 999999)"; quota_tokens=100000
-            }
-            Save-Users $users
-            $token = New-Token $un "user"
-            Send-Json -Stream $Stream -StatusCode 201 -Data @{
-                token=$token; username=$un; role="user"; api_key=($users[-1].api_key);
-                quota_tokens=100000; message="registration successful"
+            $phone = [string]$req.phone
+            if (-not (Test-PhoneCN $phone)) { Send-Error $Stream 400 "invalid phone number"; return $true }
+            $code = New-6DigitCode
+            Add-PhoneCode -Phone $phone -Code $code -ValidMinutes 5
+            # Mock: return the code in response (frontend displays it). In production, SMS gateway replaces this.
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                mock_code=$code; expire_in=300; message="verification code sent (MOCK mode - code shown in response)"
             }
         } catch { Send-Error $Stream 400 $_.Exception.Message }
         return $true
     }
+    if ($Path -eq "/api/send-email-code" -and $Method -eq "POST") {
+        try {
+            $req = $Body | ConvertFrom-Json
+            $email = [string]$req.email
+            if (-not (Test-EmailCN $email)) { Send-Error $Stream 400 "invalid email"; return $true }
+            $code = New-6DigitCode
+            Add-EmailCode -Email $email -Code $code -ValidMinutes 5
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                mock_code=$code; expire_in=300; message="verification code sent (MOCK mode - code shown in response)"
+            }
+        } catch { Send-Error $Stream 400 $_.Exception.Message }
+        return $true
+    }
+
+    # --- Register (Enhanced: phone/email verify + password strength + id_card + face + identity + activation) ---
+    if ($Path -eq "/api/register" -and $Method -eq "POST") {
+        try {
+            $req = $Body | ConvertFrom-Json
+            $un   = [string]$req.username
+            $pw   = [string]$req.password
+            if ($req.email) { $em = [string]$req.email } else { $em = "" }
+            if ($req.phone) { $phone = [string]$req.phone } else { $phone = "" }
+            if ($req.code) { $code = [string]$req.code } else { $code = "" }
+            if ($req.verify_type) { $verify_type = [string]$req.verify_type } else { $verify_type = "phone" }
+            if ($req.id_card) { $id_card = [string]$req.id_card } else { $id_card = "" }
+            if ($req.face_data) { $face_data = [string]$req.face_data } else { $face_data = "" }
+            if ($req.identity) { $identity = [string]$req.identity } else { $identity = "other" }
+            if ($req.activation_code) { $activation_code = [string]$req.activation_code } else { $activation_code = "" }
+
+            # --- Basic field validation ---
+            if ([string]::IsNullOrWhiteSpace($un) -or [string]::IsNullOrWhiteSpace($pw)) { Send-Error $Stream 400 "username and password required"; return $true }
+            if ($un.Length -lt 3) { Send-Error $Stream 400 "username min 3 chars"; return $true }
+            if ($un.Length -gt 20) { Send-Error $Stream 400 "username max 20 chars"; return $true }
+            if ($pw.Length -lt 6) { Send-Error $Stream 400 "password min 6 chars"; return $true }
+
+            # --- Verify type resolution ---
+            $resolved_email = $em
+            $resolved_phone = $phone
+            if ($verify_type -eq "phone") {
+                if (-not (Test-PhoneCN $phone)) { Send-Error $Stream 400 "invalid phone number format"; return $true }
+                if (-not (Test-PhoneCode -Phone $phone -Code $code)) { Send-Error $Stream 400 "invalid or expired phone verification code"; return $true }
+                # Auto-generate username from phone if none provided
+                if ([string]::IsNullOrWhiteSpace($un)) { $un = "u_" + ($phone.Substring($phone.Length - 6)) }
+            } elseif ($verify_type -eq "email") {
+                if (-not (Test-EmailCN $em)) { Send-Error $Stream 400 "invalid email format"; return $true }
+                if (-not (Test-EmailCode -Email $em -Code $code)) { Send-Error $Stream 400 "invalid or expired email verification code"; return $true }
+            } else {
+                Send-Error $Stream 400 "verify_type must be 'phone' or 'email'"; return $true
+            }
+
+            # --- Optional fields ---
+            if (-not [string]::IsNullOrWhiteSpace($id_card)) {
+                if (-not (Test-IDCardCN $id_card)) { Send-Error $Stream 400 "invalid ID card number format"; return $true }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($em) -and $verify_type -ne "email") {
+                if (-not (Test-EmailCN $em)) { Send-Error $Stream 400 "invalid email format"; return $true }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($phone) -and $verify_type -ne "phone") {
+                if (-not (Test-PhoneCN $phone)) { Send-Error $Stream 400 "invalid phone format"; return $true }
+            }
+
+            # --- Uniqueness checks ---
+            $existing = Load-UserByName $un
+            if ($existing) { Send-Error $Stream 400 "username already exists"; return $true }
+            if (-not [string]::IsNullOrWhiteSpace($resolved_email)) {
+                foreach ($u in (Load-Users)) { if ($u.email -and $u.email -eq $resolved_email) { Send-Error $Stream 400 "email already registered"; return $true } }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($resolved_phone)) {
+                foreach ($u in (Load-Users)) { if ($u.phone -and $u.phone -eq $resolved_phone) { Send-Error $Stream 400 "phone already registered"; return $true } }
+            }
+
+            # --- Identity whitelist ---
+            $identities = @("student","teacher","parent","engineer","other")
+            if ($identities -notcontains $identity) { $identity = "other" }
+
+            # --- Activation code redemption (optional) ---
+            $activation_applied = $false
+            if (-not [string]::IsNullOrWhiteSpace($activation_code)) {
+                # First check code existence
+                $normCode = Normalize-RailCode -Code $activation_code
+                if (-not (Get-RailCode $normCode)) { Send-Error $Stream 400 "activation code not found"; return $true }
+            }
+
+            # --- Create user ---
+            $hash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($pw))).Replace("-","")
+            $strength = Get-PasswordStrength $pw
+            $strength_label = Get-PasswordStrengthLabel $strength
+
+            $face_hash = ""
+            if (-not [string]::IsNullOrWhiteSpace($face_data)) {
+                # Don't store full face_data for privacy. Store a hash + flag.
+                $face_hash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes(($face_data.Substring(0, [Math]::Min(50, $face_data.Length)))))).Replace("-","")
+            }
+
+            if ($id_card) { $idOut = $id_card } else { $idOut = "" }
+            if ($face_hash) { $fvOut = $true } else { $fvOut = $false }
+            $users = Load-Users
+            $users += [pscustomobject]@{
+                username=$un; password_hash=$hash; role="user";
+                email=$resolved_email; phone=$resolved_phone;
+                id_card=$idOut;
+                face_hash=$face_hash; face_verified=$fvOut;
+                identity=$identity;
+                created_at=(Get-Date).ToString("o");
+                api_key="zb-$(Get-Random -Min 100000 -Max 999999)";
+                quota_tokens=100000
+            }
+            Save-Users $users
+            $newUser = $users[-1]
+
+            # --- Redeem activation if provided ---
+            if (-not [string]::IsNullOrWhiteSpace($activation_code)) {
+                $normCode = Normalize-RailCode -Code $activation_code
+                $err = Redeem-RailCode -Code $normCode -User $un
+                if ($err) {
+                    # User created but activation failed - not fatal
+                } else {
+                    $activation_applied = $true
+                }
+            }
+
+            # --- Invalidate the verification code so it cannot be reused ---
+            if ($verify_type -eq "phone" -and $script:SMS_CODES.ContainsKey($phone)) { $script:SMS_CODES.Remove($phone) }
+            if ($verify_type -eq "email" -and $script:EMAIL_CODES.ContainsKey($em.ToLower())) { $script:EMAIL_CODES.Remove($em.ToLower()) }
+
+            $token = New-Token $un "user"
+            Send-Json -Stream $Stream -StatusCode 201 -Data @{
+                token=$token; username=$un; role="user"; api_key=$newUser.api_key;
+                quota_tokens=$newUser.quota_tokens;
+                email=$newUser.email; phone=$newUser.phone;
+                identity=$identity;
+                password_strength=$strength;
+                face_verified=([bool]$face_hash);
+                activation_applied=$activation_applied;
+                message="registration successful"
+            }
+        } catch { Send-Error $Stream 400 $_.Exception.Message }
+        return $true
+    }
+
+    # --- Login (Enhanced: supports username / phone / email) ---
     if ($Path -eq "/api/login" -and $Method -eq "POST") {
         try {
             $req = $Body | ConvertFrom-Json
-            $un = [string]$req.username; $pw = [string]$req.password
-            $user = Load-UserByName $un
+            $cred = [string]$req.credential
+            $pw = [string]$req.password
+            # Fallback for old clients sending username
+            if ([string]::IsNullOrWhiteSpace($cred) -and $req.username) { $cred = [string]$req.username }
+            if ([string]::IsNullOrWhiteSpace($pw)) { Send-Error $Stream 400 "password required"; return $true }
+            if ([string]::IsNullOrWhiteSpace($cred)) { Send-Error $Stream 400 "username/phone/email required"; return $true }
+
+            $user = $null
+            if (Test-PhoneCN $cred) {
+                foreach ($u in (Load-Users)) { if ($u.phone -and $u.phone -eq $cred) { $user = $u; break } }
+            } elseif (Test-EmailCN $cred) {
+                foreach ($u in (Load-Users)) { if ($u.email -and $u.email.ToLower() -eq $cred.ToLower()) { $user = $u; break } }
+            } else {
+                $user = Load-UserByName $cred
+            }
             if (-not $user) { Send-Error $Stream 401 "invalid credentials"; return $true }
+
             $hash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($pw))).Replace("-","")
             if ($user.password_hash -ne $hash) { Send-Error $Stream 401 "invalid credentials"; return $true }
-            $token = New-Token $un $user.role
+
+            $token = New-Token $user.username $user.role
+            if ($user.phone) { $pOut = $user.phone } else { $pOut = "" }
+            if ($user.identity) { $idOut2 = $user.identity } else { $idOut2 = "other" }
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
-                token=$token; username=$un; role=$user.role; api_key=$user.api_key;
-                quota_tokens=$user.quota_tokens; email=$user.email; message="login successful"
+                token=$token; username=$user.username; role=$user.role; api_key=$user.api_key;
+                quota_tokens=$user.quota_tokens; email=$user.email; phone=$pOut;
+                identity=$idOut2;
+                message="login successful"
             }
         } catch { Send-Error $Stream 400 $_.Exception.Message }
         return $true
@@ -659,8 +1135,7 @@ function Handle-API {
         }; return $true
     }
 
-    # --- Chat endpoints (work without auth too, but with auth tracks user) ---
-    $userForQuota = if ($auth) { Load-UserByName $auth.sub } else { $null }
+    # --- Chat endpoints (work without auth too, but with auth tracks user) ---if ($auth) { $userForQuota = Load-UserByName $auth.sub } else { $userForQuota = $null }
     $quotaExceeded = $false
     if ($userForQuota -and $userForQuota.quota_tokens -le 0) { $quotaExceeded = $true }
 
@@ -672,8 +1147,8 @@ function Handle-API {
             if ($req.message) { $userMsg = [string]$req.message }
             elseif ($req.messages -and $req.messages.Count -gt 0) { $userMsg = [string]$req.messages[-1].content }
             if ([string]::IsNullOrWhiteSpace($userMsg)) { Send-Error $Stream 400 "message required"; return $true }
-            $model = if ($req.model) { [string]$req.model } else { "zb-large-v1" }
-            $sid = if ($req.session_id) { [string]$req.session_id } else { $null }
+            if ($req.model) { $model = [string]$req.model } else { $model = "zb-large-v1" }
+            if ($req.session_id) { $sid = [string]$req.session_id } else { $sid = $null }
             $replyText = Get-AIResponse -Prompt $userMsg
             $tokens = $userMsg.Length + $replyText.Length
             Invoke-RecordStat -Model $model -Tokens $tokens -Endpoint "chat"
@@ -704,9 +1179,9 @@ function Handle-API {
         try {
             if ($quotaExceeded) { Send-Error $Stream 429 "quota exceeded"; return $true }
             $req = $Body | ConvertFrom-Json
-            $prompt = if ($req.prompt) { [string]$req.prompt } else { "" }
+            if ($req.prompt) { $prompt = [string]$req.prompt } else { $prompt = "" }
             if ([string]::IsNullOrWhiteSpace($prompt)) { Send-Error $Stream 400 "prompt required"; return $true }
-            $model = if ($req.model) { [string]$req.model } else { "zb-large-v1" }
+            if ($req.model) { $model = [string]$req.model } else { $model = "zb-large-v1" }
             $text = Get-AIResponse -Prompt $prompt
             Invoke-RecordStat -Model $model -Tokens ($prompt.Length + $text.Length) -Endpoint "generate"
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
@@ -720,11 +1195,12 @@ function Handle-API {
         try {
             if ($quotaExceeded) { Send-Error $Stream 429 "quota exceeded"; return $true }
             $req = $Body | ConvertFrom-Json
-            $prompt = if ($req.prompt) { [string]$req.prompt } else { "" }
-            $language = if ($req.language) { [string]$req.language } else { "python" }
+            if ($req.prompt) { $prompt = [string]$req.prompt } else { $prompt = "" }
+            if ($req.language) { $language = [string]$req.language } else { $language = "python" }
             if ([string]::IsNullOrWhiteSpace($prompt)) { Send-Error $Stream 400 "prompt required"; return $true }
             $code = Get-AIResponse -Prompt "code $language : $prompt"
             Invoke-RecordStat -Model "zb-code-v1" -Tokens $code.Length -Endpoint "code"
+            Add-CodeHistory -User ($(if($auth.sub){$auth.sub}else{'anonymous'})) -Language $language -Prompt $prompt -Code $code -Endpoint "/api/code"
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
                 id="code_$(Get-Random -Min 100000 -Max 999999)"; language=$language; code=$code; timestamp=(Get-Date).ToString("o")
             }
@@ -736,8 +1212,8 @@ function Handle-API {
         try {
             if ($quotaExceeded) { Send-Error $Stream 429 "quota exceeded"; return $true }
             $req = $Body | ConvertFrom-Json
-            $task = if ($req.task) { [string]$req.task } else { "general" }
-            $desc = if ($req.data_description) { [string]$req.data_description } else { "" }
+            if ($req.task) { $task = [string]$req.task } else { $task = "general" }
+            if ($req.data_description) { $desc = [string]$req.data_description } else { $desc = "" }
             $insights = Get-AIResponse -Prompt "data $task : $desc"
             Invoke-RecordStat -Model "zb-large-v1" -Tokens $insights.Length -Endpoint "analyze"
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
@@ -753,7 +1229,7 @@ function Handle-API {
         try {
             if ($quotaExceeded) { Send-Error $Stream 429 "quota exceeded"; return $true }
             $req = $Body | ConvertFrom-Json
-            $prompt = if ($req.prompt) { [string]$req.prompt } else { "abstract art" }
+            if ($req.prompt) { $prompt = [string]$req.prompt } else { $prompt = "abstract art" }
             $svg = New-SvgImage $prompt
             Invoke-RecordStat -Model "zb-image-v1" -Tokens $prompt.Length -Endpoint "image"
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
@@ -776,7 +1252,7 @@ function Handle-API {
     if ($Path -eq "/api/sessions" -and $Method -eq "POST") {
         try {
             $req = $Body | ConvertFrom-Json
-            $title = if ($req.title) { [string]$req.title } else { "New Chat" }
+            if ($req.title) { $title = [string]$req.title } else { $title = "New Chat" }
             $sid = "sess_$(Get-Random -Min 100000 -Max 999999)"
             $sess = [pscustomobject]@{ id=$sid; title=$title; messages=@(); created_at=(Get-Date).ToString("o"); updated_at=(Get-Date).ToString("o") }
             Save-Session $auth.sub $sess
@@ -851,7 +1327,21 @@ function Handle-API {
                 interval=$p.interval; tag=$p.tag; description=$p.desc
             }
         }
-        Send-Json -Stream $Stream -StatusCode 200 -Data @{ products=$products; yuan_per_1000_tokens=0.001 }
+        # ZBpay 充值档位（轨道科普 & 通用）
+        $depositPlans = @(
+            [pscustomobject]@{ id="deposit_10";  amount=10;  bonus=0;   label="¥10"  },
+            [pscustomobject]@{ id="deposit_50";  amount=50;  bonus=2;   label="¥50 送¥2"  },
+            [pscustomobject]@{ id="deposit_100"; amount=100; bonus=8;   label="¥100 送¥8" },
+            [pscustomobject]@{ id="deposit_300"; amount=300; bonus=30;  label="¥300 送¥30" },
+            [pscustomobject]@{ id="deposit_500"; amount=500; bonus=60;  label="¥500 送¥60" },
+            [pscustomobject]@{ id="deposit_1000";amount=1000; bonus=150; label="¥1000 送¥150" }
+        )
+        Send-Json -Stream $Stream -StatusCode 200 -Data @{
+            products=$products; yuan_per_1000_tokens=0.001
+            zbpay_deposit_plans=$depositPlans
+            zbpay_account_name=$PAYEE_BANK.account_name
+            zbpay_bank_name=$PAYEE_BANK.bank_name
+        }
         return $true
     }
 
@@ -938,7 +1428,7 @@ function Handle-API {
     if ($Path -eq "/api/pay/webhook" -and $Method -eq "POST") {
         try {
             $req = $Body | ConvertFrom-Json
-            $oid = if ($req.order_id) { [string]$req.order_id } else { [string]$req.out_trade_no }
+            if ($req.order_id) { $oid = [string]$req.order_id } else { $oid = [string]$req.out_trade_no }
             if ([string]::IsNullOrWhiteSpace($oid)) { Send-Error $Stream 400 "order_id required"; return $true }
             $orders = Load-Orders
             $idx = -1; for ($i=0;$i -lt $orders.Count;$i++) { if ($orders[$i].order_id -eq $oid) { $idx=$i; break } }
@@ -992,10 +1482,10 @@ function Handle-API {
             $sold  = @($all | Where-Object { $_.status -eq "sold" }).Count
             $used  = @($all | Where-Object { $_.status -eq "used" }).Count
             # 分页/搜索参数
-            $filter = if ($Query.ContainsKey("status")) { $Query["status"] } else { $null }
-            $keyword = if ($Query.ContainsKey("q")) { $Query["q"].ToString().ToUpper() } else { $null }
-            $page = if ($Query.ContainsKey("page")) { [int]$Query["page"] } else { 1 }
-            $pageSize = if ($Query.ContainsKey("size")) { [int]$Query["size"] } else { 50 }
+            if ($Query.ContainsKey("status")) { $filter = $Query["status"] } else { $filter = $null }
+            if ($Query.ContainsKey("q")) { $keyword = $Query["q"].ToString().ToUpper() } else { $keyword = $null }
+            if ($Query.ContainsKey("page")) { $page = [int]$Query["page"] } else { $page = 1 }
+            if ($Query.ContainsKey("size")) { $pageSize = [int]$Query["size"] } else { $pageSize = 50 }
             $filtered = $all
             if ($filter) { $filtered = @($filtered | Where-Object { $_.status -eq $filter }) }
             if ($keyword) { $filtered = @($filtered | Where-Object { $_.code -like "*$keyword*" -or $_.batch -like "*$keyword*" -or $_.used_by -like "*$keyword*" }) }
@@ -1027,9 +1517,10 @@ function Handle-API {
                     # Skip duplicates
                     $dup = @($codesData.codes | Where-Object { $_.code -eq $code })
                     if ($dup.Count -gt 0) { $skipped++; continue }
+                    if ($req.price) { $importPrice = [int]$req.price } else { $importPrice = $null }
                     $codesData.codes += [pscustomobject]@{
                         code=$code; status="available"; target_kind=$null; target_id=$null
-                        price=if($req.price){[int]$req.price}else{0}; used_by=$null; used_at=$null; batch=$batchTag
+                        price=$importPrice
                     }
                     $added++
                 }
@@ -1086,7 +1577,7 @@ function Handle-API {
                 if (-not $code.StartsWith("ZB-")) { $code = "ZB-" + $code }
                 $tk = [string]$req.target_kind
                 $tid = [string]$req.target_id
-                $price = if($req.price){[int]$req.price}else{0}
+                if ($req.price) { $price = [int]$req.price } else { $price = 0 }
                 $found = $false
                 foreach($c in @($codesData.codes)){
                     if($c.code -eq $code){
@@ -1131,6 +1622,213 @@ function Handle-API {
         return $true
     }
 
+    # --- Admin Code Management ---
+    if ($Path -match "^/api/admin/code") {
+        if ($auth.role -ne "admin") { Send-Error $Stream 403 "admin only"; return $true }
+
+        # ========== 1. Code Templates CRUD ==========
+        if ($Path -eq "/api/admin/code/templates" -and $Method -eq "GET") {
+            $data = Load-CodeTemplates
+            if ($Query.ContainsKey("language")) { $filter = $Query["language"] } else { $filter = $null }
+            $list = @($data.templates)
+            if ($filter) { $list = @($list | Where-Object { $_.language -eq $filter }) }
+            $languages = @($data.templates | ForEach-Object { $_.language } | Sort-Object -Unique)
+            $categories = @($data.templates | ForEach-Object { $_.category } | Sort-Object -Unique)
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ templates=$list; total=$list.Count; languages=$languages; categories=$categories }
+            return $true
+        }
+        if ($Path -eq "/api/admin/code/templates" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                if ($req.id) { $tplId = [string]$req.id } else { $tplId = $null }
+                if ($req.description) { $tplDesc = [string]$req.description } else { $tplDesc = $null }
+                if ($req.category) { $tplCat = [string]$req.category } else { $tplCat = $null }
+                $tpl = [pscustomobject]@{
+                    id=$tplId; name=[string]$req.name; language=[string]$req.language
+                    description=$tplDesc; category=$tplCat
+                    code = [string]$req.code
+                    updated_at = (Get-Date).ToString("o")
+                }
+                $data = Load-CodeTemplates
+                $data.templates = @($data.templates)
+                # check duplicate id
+                foreach ($t in $data.templates) { if ($t.id -eq $tpl.id) { Send-Error $Stream 409 "template id exists"; return $true } }
+                $data.templates += $tpl
+                Save-CodeTemplates $data
+                Send-Json -Stream $Stream -StatusCode 201 -Data $tpl
+                return $true
+            } catch { Send-Error $Stream 400 "template create failed: $($_.Exception.Message)"; return $true }
+        }
+        if ($Path -match '^/api/admin/code/templates/([^/]+)$' -and $Method -eq "GET") {
+            $tid = $Matches[1]
+            $data = Load-CodeTemplates
+            $tpl = @($data.templates | Where-Object { $_.id -eq $tid } | Select-Object -First 1)
+            if (-not $tpl) { Send-Error $Stream 404 "template not found"; return $true }
+            Send-Json -Stream $Stream -StatusCode 200 -Data $tpl[0]; return $true
+        }
+        if ($Path -match '^/api/admin/code/templates/([^/]+)$' -and $Method -eq "PUT") {
+            try {
+                $tid = $Matches[1]; $req = $Body | ConvertFrom-Json
+                $data = Load-CodeTemplates; $found = $false
+                foreach ($t in @($data.templates)) {
+                    if ($t.id -eq $tid) {
+                        if ($req.name) { $t.name = [string]$req.name }
+                        if ($req.language) { $t.language = [string]$req.language }
+                        if ($null -ne $req.description) { $t.description = [string]$req.description }
+                        if ($req.category) { $t.category = [string]$req.category }
+                        if ($req.code) { $t.code = [string]$req.code }
+                        $t.updated_at = (Get-Date).ToString("o")
+                        $found = $true; break
+                    }
+                }
+                if (-not $found) { Send-Error $Stream 404 "template not found"; return $true }
+                Save-CodeTemplates $data
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; id=$tid }
+                return $true
+            } catch { Send-Error $Stream 400 "$($_.Exception.Message)"; return $true }
+        }
+        if ($Path -match '^/api/admin/code/templates/([^/]+)$' -and $Method -eq "DELETE") {
+            $tid = $Matches[1]
+            $data = Load-CodeTemplates
+            $before = @($data.templates).Count
+            $data.templates = @($data.templates | Where-Object { $_.id -ne $tid })
+            if (@($data.templates).Count -eq $before) { Send-Error $Stream 404 "template not found"; return $true }
+            Save-CodeTemplates $data
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; deleted=$tid }; return $true
+        }
+
+        # ========== 2. Code Generation History ==========
+        if ($Path -eq "/api/admin/code/history" -and $Method -eq "GET") {
+            $data = Load-CodeHistory
+            $all = @($data.history)
+            if ($Query.ContainsKey("language")) { $filter = $Query["language"] } else { $filter = $null }
+            if ($Query.ContainsKey("user"))     { $userQ = $Query["user"] }     else { $userQ = $null }
+            if ($Query.ContainsKey("q"))        { $kwQ = $Query["q"].ToString().ToLower() } else { $kwQ = $null }
+            if ($Query.ContainsKey("page"))    { $page = [int]$Query["page"] }    else { $page = 1 }
+            if ($Query.ContainsKey("size"))    { $size = [int]$Query["size"] }    else { $size = 20 }
+            if ($filter) { $all = @($all | Where-Object { $_.language -eq $filter }) }
+            if ($userQ)  { $all = @($all | Where-Object { $_.user -eq $userQ }) }
+            if ($kwQ)    { $all = @($all | Where-Object { $_.prompt.ToLower() -like "*$kwQ*" -or $_.id.ToLower() -like "*$kwQ*" }) }
+            $total = $all.Count
+            $paged = @($all | Select-Object -First $size -Skip (($page-1)*$size))
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                history=$paged; total=$total; page=$page; page_size=$size
+                languages=@($data.history | ForEach-Object { $_.language } | Sort-Object -Unique)
+                users=@($data.history | ForEach-Object { $_.user } | Sort-Object -Unique)
+            }
+            return $true
+        }
+        if ($Path -eq "/api/admin/code/history/bulk-delete" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $ids = @($req.ids)
+                if ($ids.Count -eq 0) { Send-Error $Stream 400 "ids array required"; return $true }
+                $data = Load-CodeHistory
+                $before = @($data.history).Count
+                $data.history = @($data.history | Where-Object { $ids -notcontains $_.id })
+                Save-CodeHistory $data
+                $removed = $before - @($data.history).Count
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; removed=$removed }
+                return $true
+            } catch { Send-Error $Stream 400 "$($_.Exception.Message)"; return $true }
+        }
+        if ($Path -match '^/api/admin/code/history/([A-Za-z0-9_\-]+)$' -and $Method -eq "DELETE") {
+            $hid = $Matches[1]; $data = Load-CodeHistory
+            $before = @($data.history).Count
+            $data.history = @($data.history | Where-Object { $_.id -ne $hid })
+            Save-CodeHistory $data
+            if (@($data.history).Count -eq $before) { Send-Error $Stream 404 "history entry not found"; return $true }
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok" }; return $true
+        }
+
+        # ========== 3. Code Sandbox Exec ==========
+        if ($Path -eq "/api/admin/code/exec" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $lang = [string]$req.language
+                $code = [string]$req.code
+                if ([string]::IsNullOrWhiteSpace($code)) { Send-Error $Stream 400 "code required"; return $true }
+                if ([string]::IsNullOrWhiteSpace($lang)) { $lang = "powershell" }
+                $elapsed = [math]::Round(((Get-Date).Ticks - [datetime]'2026-11-01').TotalMilliseconds)
+                $result = Invoke-CodeSandbox -Language $lang -Code $code
+                if (-not $result) { $result = [pscustomobject]@{ exit_code=-3; stdout=""; stderr="Invoke-CodeSandbox returned null"; elapsed_ms=0 } }
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                    exit_code=$result.exit_code; stdout=$result.stdout; stderr=$result.stderr
+                    elapsed_ms=$result.elapsed_ms; language=$lang
+                    sandbox = [pscustomobject]@{
+                        powershell = [bool](Get-Command powershell -EA SilentlyContinue)
+                        python     = [bool](Get-Command python -EA SilentlyContinue -or (Get-Command python3 -EA SilentlyContinue))
+                        node       = [bool](Get-Command node -EA SilentlyContinue)
+                    }
+                }
+                return $true
+            } catch { Send-Error $Stream 400 "exec failed: $($_.Exception.Message)"; return $true }
+        }
+
+        # ========== 4. System File Browser (安全限制 workspace) ==========
+        if ($Path -eq "/api/admin/code/files" -and $Method -eq "GET") {
+            try {
+                if ($Query.ContainsKey("path")) { $rel = [string]$Query["path"] } else { $rel = "" }
+                # 安全：规范化路径，禁止 .. 跳出 workspace
+                $full = Join-Path $SCRIPT_ROOT $rel
+                $norm = [System.IO.Path]::GetFullPath($full)
+                $root = [System.IO.Path]::GetFullPath($SCRIPT_ROOT)
+                if (-not $norm.StartsWith($root)) { Send-Error $Stream 403 "path escapes workspace"; return $true }
+                if (-not (Test-Path $norm)) { Send-Error $Stream 404 "not found"; return $true }
+                if ((Get-Item $norm).PSIsContainer) {
+                    $items = Get-ChildItem $norm -Force | Select-Object Name, FullName, PSIsContainer, Length, LastWriteTime
+                    $data = @($items | ForEach-Object {
+                        if ($_.PSIsContainer) { $fsize = $null } else { $fsize = $_.Length }
+                        [pscustomobject]@{
+                            size=$fsize
+                            modified=$_.LastWriteTime.ToString("o")
+                        }
+                    })
+                    if ($rel) { $dirPath = $rel; $dirParent = [IO.Path]::GetDirectoryName($rel) } else { $dirPath = $null; $dirParent = $null }
+                    Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                        path=$dirPath; parent=$dirParent
+                        items=$data; total=$data.Count; is_dir=$true
+                    }
+                } else {
+                    $content = [IO.File]::ReadAllText($norm)
+                    $lines = ($content -split "`r?`n").Count
+                    $ext = [IO.Path]::GetExtension($norm).TrimStart(".")
+                    $size = (Get-Item $norm).Length
+                    if ($rel) { $fPath = $rel } else { $fPath = $null }
+                    Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                        path=$fPath
+                        name=[IO.Path]::GetFileName($norm); ext=$ext; size=$size; lines=$lines
+                        content=$content; is_dir=$false
+                    }
+                }
+                return $true
+            } catch { Send-Error $Stream 400 "$($_.Exception.Message)"; return $true }
+        }
+        if ($Path -eq "/api/admin/code/save" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $rel = [string]$req.path; $content = [string]$req.content
+                if ([string]::IsNullOrWhiteSpace($rel)) { Send-Error $Stream 400 "path required"; return $true }
+                $full = Join-Path $SCRIPT_ROOT $rel
+                $norm = [System.IO.Path]::GetFullPath($full)
+                $root = [System.IO.Path]::GetFullPath($SCRIPT_ROOT)
+                if (-not $norm.StartsWith($root)) { Send-Error $Stream 403 "path escapes workspace"; return $true }
+                # 禁止保存到 data 目录和 .git 目录（保护敏感数据）
+                $dataDir = Join-Path $root "data"; $gitDir = Join-Path $root ".git"
+                if ($norm.StartsWith([System.IO.Path]::GetFullPath($dataDir)) -or $norm.StartsWith([System.IO.Path]::GetFullPath($gitDir))) {
+                    Send-Error $Stream 403 "cannot save to data/ or .git/ directory"; return $true
+                }
+                $enc = New-Object System.Text.UTF8Encoding($true)  # 带 BOM
+                [IO.File]::WriteAllText($norm, $content, $enc)
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; path=$rel; size=$content.Length; saved_at=(Get-Date).ToString("o") }
+                return $true
+            } catch { Send-Error $Stream 400 "save failed: $($_.Exception.Message)"; return $true }
+        }
+
+        Send-Error $Stream 404 "admin code endpoint not found"
+        return $true
+    }
+
     # --- Admin Pay ---
     if ($Path -match "^/api/pay/admin" -and $payAuth.role -ne "admin") { Send-Error $Stream 403 "admin only"; return $true }
     if ($Path -eq "/api/pay/admin/all-orders") {
@@ -1163,7 +1861,7 @@ function Handle-API {
     if ($Path -eq "/api/pay/admin/manual-credit" -and $Method -eq "POST") {
         try {
             $req = $Body | ConvertFrom-Json
-            $target = [string]$req.username; $quota = [int]$req.quota_tokens; $note = if ($req.note) { [string]$req.note } else { "admin manual credit" }
+            $target = [string]$req.username; $quota = [int]$req.quota_tokens;if ($req.note) { $note = [string]$req.note } else { $note = "admin manual credit" }
             if ([string]::IsNullOrWhiteSpace($target) -or $quota -eq 0) { Send-Error $Stream 400 "username and non-zero quota_tokens required"; return $true }
             $ok = Add-UserQuota -Username $target -Delta $quota -Reason "admin"
             if (-not $ok) { Send-Error $Stream 404 "user not found"; return $true }
@@ -1178,15 +1876,15 @@ function Handle-API {
 
     # Dashboard overview
     if ($Path -eq "/api/ent/dashboard") {
-        $em = if (Test-Path $ENT_EMP_FILE) { @((Get-Content $ENT_EMP_FILE -Raw | ConvertFrom-Json).employees) } else { @() }
-        $de = if (Test-Path $ENT_DEPT_FILE) { @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { @() }
-        $st = if (Test-Path $STATS_FILE) { Get-Content $STATS_FILE -Raw | ConvertFrom-Json } else { @{ daily=@{} } }
+        if (Test-Path $ENT_EMP_FILE) { $em = @((Get-Content $ENT_EMP_FILE -Raw | ConvertFrom-Json).employees) } else { $em = @() }
+        if (Test-Path $ENT_DEPT_FILE) { $de = @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { $de = @() }
+        if (Test-Path $STATS_FILE) { $st = Get-Content $STATS_FILE -Raw | ConvertFrom-Json }
         $today = (Get-Date).ToString("yyyy-MM-dd")
         # AI usage trend 7 days
         $trend = @()
         for ($d = 6; $d -ge 0; $d--) {
             $dt = (Get-Date).AddDays(-$d).ToString("yyyy-MM-dd")
-            $cnt = if ($st.daily -and $st.daily.PSObject.Properties[$dt]) { $st.daily.$dt.calls } else { if ($d -eq 0) { 1234 } else { Get-Random -Min 400 -Max 2000 } }
+if ($st.daily -and $st.daily.PSObject.Properties[$dt]) { $cnt = $st.daily.$dt.calls } else { $cnt = Get-Random -Min 400 -Max 2000 }
             $trend += @{ date=$dt; calls=$cnt }
         }
         # AI model distribution (mocked)
@@ -1218,20 +1916,19 @@ function Handle-API {
     }
 
     # Departments
-    if ($Path -eq "/api/ent/departments") {
-        $de = if (Test-Path $ENT_DEPT_FILE) { @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { @() }
+    if ($Path -eq "/api/ent/departments") {if (Test-Path $ENT_DEPT_FILE) { $de = @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { $de = @() }
         Send-Json -Stream $Stream -StatusCode 200 -Data @{ departments=$de }
         return $true
     }
 
     # Employees
     if ($Path -eq "/api/ent/employees") {
-        $em = if (Test-Path $ENT_EMP_FILE) { @((Get-Content $ENT_EMP_FILE -Raw | ConvertFrom-Json).employees) } else { @() }
-        $de = if (Test-Path $ENT_DEPT_FILE) { @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { @() }
+        if (Test-Path $ENT_EMP_FILE) { $em = @((Get-Content $ENT_EMP_FILE -Raw | ConvertFrom-Json).employees) } else { $em = @() }
+        if (Test-Path $ENT_DEPT_FILE) { $de = @((Get-Content $ENT_DEPT_FILE -Raw | ConvertFrom-Json).departments) } else { $de = @() }
         $lookup = @{}; foreach ($d in $de) { $lookup[$d.id] = $d.name }
         $withDept = @()
         foreach ($e in $em) {
-            $dn = if ($e.department_id -and $lookup.ContainsKey($e.department_id)) { $lookup[$e.department_id] } else { "-" }
+            if ($e.department_id -and $lookup.ContainsKey($e.department_id)) { $dn = $lookup[$e.department_id] } else { $dn = "-" }
             $withDept += [pscustomobject]@{ id=$e.id; name=$e.name; position=$e.position; department=$dn; email=$e.email; phone=$e.phone; status=$e.status; join_date=$e.join_date; role=$e.role }
         }
         Send-Json -Stream $Stream -StatusCode 200 -Data @{ employees=$withDept; total=$withDept.Count; active=@($withDept | Where-Object { $_.status -eq "active" }).Count }
@@ -1239,8 +1936,7 @@ function Handle-API {
     }
 
     # Audit logs
-    if ($Path -eq "/api/ent/audit-logs") {
-        $lg = if (Test-Path $ENT_LOG_FILE) { @((Get-Content $ENT_LOG_FILE -Raw | ConvertFrom-Json).logs) } else { @() }
+    if ($Path -eq "/api/ent/audit-logs") {if (Test-Path $ENT_LOG_FILE) { $lg = @((Get-Content $ENT_LOG_FILE -Raw | ConvertFrom-Json).logs) } else { $lg = @() }
         $all = @($lg | Sort-Object time -Descending)
         # Pad with some extra demo logs if short
         if ($all.Count -lt 20) {
@@ -1249,7 +1945,7 @@ function Handle-API {
                 $actions = @("访问控制台","创建工单","审批流程","查看数据报表","配置AI模型","修改安全策略","导出审计日志","新增应用")
                 $actor = $actors[(Get-Random -Min 0 -Max $actors.Count)]
                 $act = $actions[(Get-Random -Min 0 -Max $actions.Count)]
-                $sev = if ($act -match "审批|导出|策略") { "warning" } else { "info" }
+                if ($act -match "审批|导出|策略") { $sev = "warning" } else { $sev = "info" }
                 $all = @([pscustomobject]@{ id="log_$(Get-Random -Min 1000 -Max 9999)"; time=(Get-Date).AddMinutes(-(Get-Random -Min 10 -Max 1440)).ToString("o"); actor=$actor; action=$act; target="auto_gen_$i"; severity=$sev }) + $all
             }
         }
@@ -1281,15 +1977,16 @@ function Handle-API {
 
         # 首页总览：todos + schedule + messages + docs
         if ($Path -eq "/api/wb/overview") {
-            $wb = if (Test-Path $WB_TODO_FILE) { Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json } else { @{ todos=@(); schedule=@(); messages=@(); docs=@() } }
-            $appsData = if (Test-Path $WB_APP_FILE) { Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json } else { @{ apps=@(); ai_models=@() } }
+if (Test-Path $WB_TODO_FILE) { $wb = Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json }
+if (Test-Path $WB_APP_FILE) { $appsData = Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json }
             $now = Get-Date
             $todayStr = $now.ToString("yyyy-MM-dd")
             $todaySchedule = @($wb.schedule | Where-Object { $_.date -eq $todayStr })
             $pendingTodos = @($wb.todos | Where-Object { $_.status -eq "pending" })
+            if ($auth.role) { $wbRole = $auth.role } else { $wbRole = "member" }
+            if ($now.Hour -lt 11) { $wbGreet = "早上好" } else { $wbGreet = "晚上好" }
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
-                user=@{ name=$auth.sub; role=if($auth.role){$auth.role}else{"member"}; avatar=$auth.sub.Substring(0,1).ToUpper() }
-                greeting=if($now.Hour -lt 11){"早上好"}elseif($now.Hour -lt 14){"中午好"}elseif($now.Hour -lt 18){"下午好"}else{"晚上好"}
+                role=$wbRole; greeting=$wbGreet
                 date_str=$now.ToString("yyyy年MM月dd日 dddd", [Globalization.CultureInfo]::GetCultureInfo("zh-CN"))
                 unread_count=@($wb.messages | Where-Object { $_.unread }).Count
                 pending_count=$pendingTodos.Count
@@ -1305,7 +2002,7 @@ function Handle-API {
 
         # 应用中心 + AI 模型列表
         if ($Path -eq "/api/wb/apps") {
-            $appsData = if (Test-Path $WB_APP_FILE) { Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json } else { @{ apps=@(); ai_models=@() } }
+if (Test-Path $WB_APP_FILE) { $appsData = Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json }
             Send-Json -Stream $Stream -StatusCode 200 -Data @{
                 apps=@($appsData.apps)
                 ai_models=@($appsData.ai_models)
@@ -1315,23 +2012,23 @@ function Handle-API {
 
         # 我的待办
         if ($Path -eq "/api/wb/todos") {
-            $wb = if (Test-Path $WB_TODO_FILE) { Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json } else { @{ todos=@() } }
+if (Test-Path $WB_TODO_FILE) { $wb = Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json }
             Send-Json -Stream $Stream -StatusCode 200 -Data @{ todos=@($wb.todos); total=@($wb.todos).Count; pending=@($wb.todos | Where-Object { $_.status -eq "pending" }).Count }
             return $true
         }
 
         # 今日日程
         if ($Path -eq "/api/wb/schedule") {
-            $wb = if (Test-Path $WB_TODO_FILE) { Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json } else { @{ schedule=@() } }
+if (Test-Path $WB_TODO_FILE) { $wb = Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json }
             Send-Json -Stream $Stream -StatusCode 200 -Data @{ schedule=@($wb.schedule); total=@($wb.schedule).Count }
             return $true
         }
 
         # 简单搜索（apps + docs）
         if ($Path -eq "/api/wb/search") {
-            $wb = if (Test-Path $WB_TODO_FILE) { Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json } else { @{ docs=@() } }
-            $appsData = if (Test-Path $WB_APP_FILE) { Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json } else { @{ apps=@() } }
-            $q = if ($Query.ContainsKey('q')) { [string]$Query['q'] } else { "" }
+if (Test-Path $WB_TODO_FILE) { $wb = Get-Content $WB_TODO_FILE -Raw | ConvertFrom-Json }
+if (Test-Path $WB_APP_FILE) { $appsData = Get-Content $WB_APP_FILE -Raw | ConvertFrom-Json }
+            if ($Query.ContainsKey('q')) { $q = [string]$Query['q'] } else { $q = "" }
             if (-not [string]::IsNullOrWhiteSpace($q)) {
                 $appsData = @($appsData.apps | Where-Object { $_.name -match [regex]::Escape($q) -or $_.desc -match [regex]::Escape($q) })
                 $docMatches = @($wb.docs | Where-Object { $_.name -match [regex]::Escape($q) })
@@ -1349,10 +2046,17 @@ function Handle-API {
 
     # --- Rail Academy (轨道科普) ---
     if ($Path -match "^/api/rail") {
-        # 加载 catalog（公开）和 prog（需要时）
-        $cat = if (Test-Path $RAIL_CAT_FILE) { Get-Content $RAIL_CAT_FILE -Raw | ConvertFrom-Json } else { [pscustomobject]@{ meta=[pscustomobject]@{}; units=@() } }
-        $prog = if (Test-Path $RAIL_PROG_FILE) { (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) } else { [pscustomobject]@{ user_prog=[pscustomobject]@{} } }
-        $myProg = if ($auth.sub -and $prog.user_prog.PSObject.Properties[$auth.sub]) { $prog.user_prog.$($auth.sub) } else { [pscustomobject]@{ unlocked_units=@(); unlocked_parts=@(); unlocked_lessons=@(); paid_total=0 } }
+        # 加载 catalog（公开）和 prog（需要时）和 video-meta（lesson 详情用）
+if (Test-Path $RAIL_CAT_FILE) { $cat = Get-Content $RAIL_CAT_FILE -Raw -Encoding UTF8 | ConvertFrom-Json }
+if (Test-Path $RAIL_PROG_FILE) { $prog = (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) }
+if ($auth.sub -and $prog.user_prog.PSObject.Properties[$auth.sub]) { $myProg = $prog.user_prog.$($auth.sub) }
+        # video-meta 缓存（脚本级变量，首次加载后复用）
+        if (-not $script:zbVideoMeta) {
+            if (Test-Path $RAIL_VIDEO_META_FILE) {
+                try { $script:zbVideoMeta = Get-Content $RAIL_VIDEO_META_FILE -Raw -Encoding UTF8 | ConvertFrom-Json }
+                catch { $script:zbVideoMeta = [pscustomobject]@{} }
+            } else { $script:zbVideoMeta = [pscustomobject]@{} }
+        }
 
         # ========== 公开端点（无需登录） ==========
 
@@ -1385,27 +2089,53 @@ function Handle-API {
             Send-Error $Stream 404 "part not found"; return $true
         }
 
-        # ========== 以下端点需要登录 ==========
-        if (-not $auth.sub) { Send-Error $Stream 401 "login required"; return $true }
+        # 可用的支付方式列表（公开）
+        if ($Path -eq "/api/rail/pay-methods") {
+            if ($auth.sub) { $balance = Get-ZbBalance $auth.sub } else { $balance = 0 }
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                methods = @($RAIL_PAY_METHODS)
+                prices  = @($RAIL_PRICE_MAP.GetEnumerator() | ForEach-Object { @{ kind=$_.Key; amount=$_.Value } })
+                zbpay_balance = $balance
+                payee_bank = (Get-PayeeBankMasked)
+            }
+            return $true
+        }
 
-        # 单个 lesson 详情（含 doc_markdown + video meta + free/unlocked）
+        # 视频元数据（公开，大文件，直接原始传输避免 depth 限制）
+        if ($Path -eq "/api/rail/video-meta") {
+            if (Test-Path $RAIL_VIDEO_META_FILE) {
+                $raw = [IO.File]::ReadAllText($RAIL_VIDEO_META_FILE)
+                Send-JsonRaw -Stream $Stream -RawText $raw -StatusCode 200
+            } else {
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{}
+            }
+            return $true
+        }
+
+        # 单个 lesson 详情（含 doc_markdown + free/unlocked）——公开访问，免费单元无需登录
         if ($Path -match '^/api/rail/lesson/(\w+)$') {
             $lid = $Matches[1]
+            $videoMeta = $null
+            if ($script:zbVideoMeta -and $script:zbVideoMeta.PSObject.Properties[$lid]) { $videoMeta = $script:zbVideoMeta.$lid }
+            $hasAuth = ($auth.sub -and ($myProg -ne $null))
             foreach($u in $cat.units){
                 foreach($p in $u.parts){
                     $l = @($p.lessons | Where-Object { $_.id -eq $lid })
                     if($l.Count -gt 0){
                         $isFreeLesson = [bool]$l[0].free
                         $isFreeUnit = [bool]$u.free
-                        $unlocked = $isFreeLesson -or $isFreeUnit -or
-                                    ($myProg.unlocked_units -contains $u.no) -or
-                                    ($myProg.unlocked_parts -contains $p.id) -or
-                                    ($myProg.unlocked_lessons -contains $l[0].id) -or
-                                    ($auth.role -eq "admin")
+                        $unlocked = $isFreeLesson -or $isFreeUnit
+                        if ($hasAuth) {
+                            $unlocked = $unlocked -or
+                                ($myProg.unlocked_units -contains $u.no) -or
+                                ($myProg.unlocked_parts -contains $p.id) -or
+                                ($myProg.unlocked_lessons -contains $l[0].id) -or
+                                ($auth.role -eq "admin")
+                        }
                         Send-Json -Stream $Stream -StatusCode 200 -Data @{
                             lesson=$l[0]; unit=$u.no; unit_name=$u.name; part=$p.no; part_name=$p.name
                             is_free=[bool]$isFreeLesson; unit_free=[bool]$isFreeUnit; unlocked=[bool]$unlocked
-                            meta=$cat.meta
+                            meta=$cat.meta; video_meta=$videoMeta
                         }
                         return $true
                     }
@@ -1414,9 +2144,62 @@ function Handle-API {
             Send-Error $Stream 404 "lesson not found"; return $true
         }
 
+        # ========== 以下端点需要登录 ==========
+        if (-not $auth.sub) { Send-Error $Stream 401 "login required"; return $true }
+
         # 我的进度（解锁状态）
         if ($Path -eq "/api/rail/progress") {
             Send-Json -Stream $Stream -StatusCode 200 -Data @{ user=$auth.sub; prog=$myProg; role=$auth.role }
+            return $true
+        }
+
+        # ========== 完整收款银行卡号（两步验证） ==========
+        # 步骤1: POST /api/rail/bank-reveal-token — 生成一次性 6 位验证码（3 分钟有效，1 次使用）
+        if ($Path -eq "/api/rail/bank-reveal-token" -and $Method -eq "POST") {
+            # 限流：同一用户 60 秒内只能发 1 次
+            $key = "bank_reveal_$($auth.sub)"
+            $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            if ($script:bankRevealLastCall -and $script:bankRevealLastCall.ContainsKey($key) -and ($now - $script:bankRevealLastCall[$key] -lt 60)) {
+                Send-Error $Stream 429 "请 $((60 - ($now - $script:bankRevealLastCall[$key]))) 秒后再试"; return $true
+            }
+            if (-not $script:bankRevealLastCall) { $script:bankRevealLastCall = @{} }
+            $script:bankRevealLastCall[$key] = $now
+            # 生成 6 位 token
+            $token = ('{0:D6}' -f (Get-Random -Min 0 -Max 1000000))
+            $script:bankRevealTokens[$auth.sub] = @{ token=$token; expires=$now+180; used=$false }
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                message="请确认是本人操作，输入下方 6 位验证码后可查看完整卡号"
+                reveal_code=$token  # MOCK 模式直接返回
+                expire_in=180
+            }
+            return $true
+        }
+
+        # 步骤2: POST /api/rail/bank-card — 用 token 换完整卡号（1 次有效）
+        if ($Path -eq "/api/rail/bank-card" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $code = [string]$req.reveal_code
+                $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+                $entry = $null
+                if ($script:bankRevealTokens -and $script:bankRevealTokens.ContainsKey($auth.sub)) {
+                    $entry = $script:bankRevealTokens[$auth.sub]
+                }
+                if (-not $entry) { Send-Error $Stream 400 "请先获取验证码"; return $true }
+                if ($entry.used) { Send-Error $Stream 400 "验证码已使用，请重新获取"; return $true }
+                if ($now -gt $entry.expires) { Send-Error $Stream 400 "验证码已过期"; return $true }
+                if ($code -ne $entry.token) { Send-Error $Stream 400 "验证码错误"; return $true }
+                # 标记已使用
+                $entry.used = $true
+                # 返回完整号（仅这一次）
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                    bank_name    = $PAYEE_BANK.bank_name
+                    account_name = $PAYEE_BANK.account_name
+                    account_no   = $PAYEE_BANK.account_no  # 完整号，仅通过此接口暴露
+                    swift        = $PAYEE_BANK.swift
+                    message      = "完整卡号仅本次有效，请妥善保存"
+                }
+            } catch { Send-Error $Stream 400 "reveal failed: $($_.Exception.Message)" }
             return $true
         }
 
@@ -1432,11 +2215,169 @@ function Handle-API {
                 if ($err) { Send-Error $Stream 400 $err; return $true }
 
                 # 刷新 prog
-                $prog2 = if (Test-Path $RAIL_PROG_FILE) { (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) } else { [pscustomobject]@{ user_prog=[pscustomobject]@{} } }
-                $myProg2 = if ($prog2.user_prog.PSObject.Properties[$auth.sub]) { $prog2.user_prog.$($auth.sub) } else { [pscustomobject]@{ unlocked_units=@(); unlocked_parts=@(); unlocked_lessons=@(); paid_total=0 } }
+if (Test-Path $RAIL_PROG_FILE) { $prog2 = (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) }
+if ($prog2.user_prog.PSObject.Properties[$auth.sub]) { $myProg2 = $prog2.user_prog.$($auth.sub) }
                 Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; code=$code; prog=$myProg2 }
                 return $true
             } catch { Send-Error $Stream 400 "redeem failed: $($_.Exception.Message)"; return $true }
+        }
+
+        # ========== 轨道课程在线支付订单系列 ==========
+
+        # POST /api/rail/orders — 创建订单
+        if ($Path -eq "/api/rail/orders" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $kind = [string]$req.kind             # unit|part|lesson
+                $targetId = [string]$req.target_id    # u3 / u3p5 / u3p5l7
+                $payMethod = [string]$req.pay_method  # alipay|wechat|bank|zbpay|google|apple
+
+                if (-not @("unit","part","lesson") -contains $kind) { Send-Error $Stream 400 "kind must be unit|part|lesson"; return $true }
+                if ([string]::IsNullOrWhiteSpace($targetId)) { Send-Error $Stream 400 "target_id required"; return $true }
+                $validIds = @($RAIL_PAY_METHODS | ForEach-Object { $_.id })
+                if (-not ($payMethod -in $validIds)) { Send-Error $Stream 400 "invalid pay_method"; return $true }
+
+                # ZBpay 余额：扣余额，立即完成
+                $amount = Get-Price $kind
+                $orderId = New-OrderId
+
+                if ($payMethod -eq "zbpay") {
+                    $bal = Get-ZbBalance $auth.sub
+                    if ($bal -lt $amount) { Send-Error $Stream 400 "ZBpay 余额不足，当前 ¥$bal，需 ¥$amount"; return $true }
+                    $ok = Deduct-ZbBalance $auth.sub $amount $orderId
+                    if (-not $ok) { Send-Error $Stream 400 "余额扣减失败"; return $true }
+                }
+
+                # 写订单
+                $orders = Load-RailOrders
+                $entry = [pscustomobject]@{
+                    order_id = $orderId
+                    username = $auth.sub
+                    kind = $kind
+                    target_id = $targetId
+                    amount = $amount
+                    pay_method = $payMethod
+                    status = $(if($payMethod -eq "zbpay"){"paid"}else{"pending"})
+                    created_at = (Get-Date).ToString("o")
+                    paid_at = $(if($payMethod -eq "zbpay"){(Get-Date).ToString("o")}else{$null})
+                    transaction_id = $(if($payMethod -eq "zbpay"){"ZB-$orderId"}else{$null})
+                }
+                $orders.orders = @($entry) + @($orders.orders)
+                Save-RailOrders $orders
+
+                # 如果是 zbpay：立即解锁，返回 complete 状态
+                if ($payMethod -eq "zbpay") {
+                    Complete-RailOrder -OrderId $orderId -PayMethod "zbpay" -TransactionId "ZB-$orderId" -User $auth.sub | Out-Null
+if (Test-Path $RAIL_PROG_FILE) { $prog2 = (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) }
+if ($prog2.user_prog.PSObject.Properties[$auth.sub]) { $myProg2 = $prog2.user_prog.$($auth.sub) }
+                    Send-Json -Stream $Stream -StatusCode 201 -Data @{
+                        order_id=$orderId; amount=$amount; pay_method=$payMethod; status="paid"
+                        checkout_info=@{ method="zbpay"; balance_before=($bal+$amount); balance_after=$bal }
+                        prog=$myProg2; just_unlocked=$true
+                    }
+                    return $true
+                }
+
+                # 其他方式：构造 checkout_info 供前端展示
+                $methodMeta = @($RAIL_PAY_METHODS | Where-Object { $_.id -eq $payMethod })[0]
+                # 真实 QR 码（根据支付方式生成不同协议 + 更真实的视觉效果）
+                $qrUrl = $null; $scheme = $null
+                if ($payMethod -eq "alipay") {
+                    $qrUrl = New-AlipayQr -OrderId $orderId -Amount $amount -Note "智北轨道科普"
+                    $scheme = "alipays://"
+                } elseif ($payMethod -eq "wechat") {
+                    $qrUrl = New-WechatQr -OrderId $orderId -Amount $amount -Note "智北轨道科普"
+                    $scheme = "weixin://"
+                } elseif ([bool]$methodMeta.needs_qr) {
+                    $qrUrl = New-BankTransferQr -OrderId $orderId -Amount $amount
+                }
+                $checkoutInfo = @{
+                    method = $payMethod
+                    needs_qr = [bool]$methodMeta.needs_qr
+                    qr_url  = $qrUrl
+                    qr_scheme = $scheme
+                    direct_url = "ZBBIZ://pay?order=$orderId&method=$payMethod"
+                    zb_deposit = [bool]$methodMeta.zbdeposit
+                    amount = $amount
+                    order_id = $orderId
+                    expires_at = (Get-Date).AddMinutes(15).ToString("o")
+                    expires_in_seconds = 900
+                    payee_bank = (Get-PayeeBankMasked)
+                    hint = $(
+                        if ($payMethod -eq "bank")   { "请向下方统一收款账户转账 ¥$amount，备注订单号 $orderId" }
+                        elseif ($payMethod -eq "google") { "Google Pay 暂未对接，请改用支付宝/微信/ZBpay 充值" }
+                        elseif ($payMethod -eq "apple")  { "Apple Pay 暂未对接，请改用支付宝/微信/ZBpay 充值" }
+                        elseif ($payMethod -eq "alipay") { "📱 打开支付宝 → 扫一扫 → 确认支付 ¥$amount（订单号 $orderId）" }
+                        elseif ($payMethod -eq "wechat") { "💬 打开微信 → 扫一扫 → 确认支付 ¥$amount（订单号 $orderId）" }
+                        else { "请完成支付 ¥$amount（订单号 $orderId）" }
+                    )
+                }
+
+                Send-Json -Stream $Stream -StatusCode 201 -Data @{
+                    order_id=$orderId; amount=$amount; pay_method=$payMethod; status="pending"
+                    checkout_info=$checkoutInfo
+                    poll_url="/api/rail/orders/$orderId"
+                }
+                return $true
+            } catch {
+                $stack = $_.ScriptStackTrace
+                Write-Host "[ERROR] create order failed: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "  Stack: $stack" -ForegroundColor Red
+                Send-Error $Stream 400 "create order failed: $($_.Exception.Message)"
+                return $true
+            }
+        }
+
+        # GET /api/rail/orders — 我的订单列表
+        if ($Path -eq "/api/rail/orders") {
+            $orders = Load-RailOrders
+            $mine = @($orders.orders | Where-Object { $_.username -eq $auth.sub } | Select-Object -First 50)
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ orders=$mine; total=@($orders.orders | Where-Object { $_.username -eq $auth.sub }).Count }
+            return $true
+        }
+
+        # GET /api/rail/orders/:id — 订单详情
+        if ($Path -match '^/api/rail/orders/(ZO-[A-Z0-9]+)$') {
+            $oid = $Matches[1]
+            $orders = Load-RailOrders
+            $o = @($orders.orders | Where-Object { $_.order_id -eq $oid -and $_.username -eq $auth.sub })
+            if ($o.Count -eq 0) { Send-Error $Stream 404 "order not found"; return $true }
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ order=$o[0] }
+            return $true
+        }
+
+        # POST /api/rail/orders/:id/complete — 模拟完成支付（前端确认或 ZBpay Webhook 触发）
+        if ($Path -match '^/api/rail/orders/(ZO-[A-Z0-9]+)/complete$' -and $Method -eq "POST") {
+            try {
+                $oid = $Matches[1]
+                $req = $Body | ConvertFrom-Json
+                if ($req.pay_method) { $payMethod = [string]$req.pay_method } else { $payMethod = "mock" }
+                if ($req.transaction_id) { $txnId = [string]$req.transaction_id } else { $txnId = $null }
+
+                $err = Complete-RailOrder -OrderId $oid -PayMethod $payMethod -TransactionId $txnId -User $auth.sub
+                if ($err) { Send-Error $Stream 400 $err; return $true }
+
+                # 完整返回
+                $orders = Load-RailOrders
+                $o = @($orders.orders | Where-Object { $_.order_id -eq $oid })[0]
+if (Test-Path $RAIL_PROG_FILE) { $prog2 = (Get-Content $RAIL_PROG_FILE -Raw | ConvertFrom-Json) }
+if ($prog2.user_prog.PSObject.Properties[$auth.sub]) { $myProg2 = $prog2.user_prog.$($auth.sub) }
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; order=$o; prog=$myProg2 }
+                return $true
+            } catch { Send-Error $Stream 400 "complete order failed: $($_.Exception.Message)"; return $true }
+        }
+
+        # POST /api/rail/deposit — 给 ZBpay 余额充值（mock 模式，方便测试）
+        if ($Path -eq "/api/rail/deposit" -and $Method -eq "POST") {
+            try {
+                $req = $Body | ConvertFrom-Json
+                $amount = [double]$req.amount
+                if ($amount -le 0 -or $amount -gt 10000) { Send-Error $Stream 400 "amount must be 0-10000"; return $true }
+                if ($req.channel) { $channel = [string]$req.channel } else { $channel = "mock" }
+                Add-ZbBalance -User $auth.sub -Amount $amount -Ref "DEPOSIT-$(Get-Random)"
+                Send-Json -Stream $Stream -StatusCode 200 -Data @{ status="ok"; amount=$amount; channel=$channel; balance=(Get-ZbBalance $auth.sub) }
+                return $true
+            } catch { Send-Error $Stream 400 "deposit failed: $($_.Exception.Message)"; return $true }
         }
 
         Send-Error $Stream 404 "rail endpoint not found"
@@ -1477,8 +2418,28 @@ try {
     while ($true) {
         $client = $tcp.AcceptTcpClient(); $stream = $client.GetStream()
         try {
-            $buffer = New-Object byte[] 65536
-            $bytesRead = $stream.Read($buffer, 0, $buffer.Length)
+            $buffer = New-Object byte[] 262144  # 256KB
+            $totalRead = 0
+            while ($totalRead -lt $buffer.Length) {
+                $toRead = [Math]::Min(8192, $buffer.Length - $totalRead)
+                $read = $stream.Read($buffer, $totalRead, $toRead)
+                if ($read -le 0) { break }
+                $totalRead += $read
+                # 找 header 结束标记
+                $hdrEnd = -1
+                for ($j = 0; $j -lt $totalRead - 3; $j++) {
+                    if ($buffer[$j] -eq 13 -and $buffer[$j+1] -eq 10 -and $buffer[$j+2] -eq 13 -and $buffer[$j+3] -eq 10) { $hdrEnd = $j; break }
+                }
+                if ($hdrEnd -ge 0) {
+                    $hdrStr = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $hdrEnd)
+                    $cl = [regex]::Match($hdrStr, 'Content-Length:\s*(\d+)', 'IgnoreCase')
+                    if ($cl.Success) { $need = [int]$cl.Groups[1].Value } else { $need = 0 }
+                    $have = $totalRead - ($hdrEnd + 4)
+                    if ($have -ge $need) { break }
+                    if ($need -gt 0 -and ($totalRead + ($need - $have)) -gt $buffer.Length) { break }
+                }
+            }
+            $bytesRead = $totalRead
             if ($bytesRead -le 0) { continue }
             $requestText = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $bytesRead)
             $lines = $requestText -split "`r`n"

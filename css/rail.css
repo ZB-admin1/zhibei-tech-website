@@ -349,3 +349,77 @@ html, body {
 .rb-empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
 .rb-empty .rb-e-emoji { font-size: 48px; margin-bottom: 16px; }
 .rb-tag { display: inline-block; padding: 2px 8px; font-size: 11px; background: var(--bg); border-radius: 4px; color: var(--text-3); }
+
+/* ---------- Register Modal Enhanced v2 ---------- */
+.rb-modal.rb-register { width: 460px; max-height: 90vh; overflow-y: auto; }
+.rb-reg-steps {
+  display: flex; justify-content: space-between; padding: 16px 24px 0;
+  border-bottom: 1px solid var(--border); margin-bottom: 16px;
+}
+.rb-reg-step {
+  flex: 1; text-align: center; font-size: 12px; color: var(--text-3);
+  padding-bottom: 12px; position: relative; font-weight: 600;
+}
+.rb-reg-step span {
+  display: inline-block; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--border); color: var(--text-3);
+  line-height: 20px; margin-right: 4px; font-size: 12px; font-weight: 700;
+}
+.rb-reg-step.active { color: var(--brand); }
+.rb-reg-step.active span { border-color: var(--brand); background: var(--brand); color: #fff; }
+.rb-reg-step.done { color: var(--success); }
+.rb-reg-step.done span { border-color: var(--success); background: var(--success); color: #fff; }
+
+.rb-reg-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.rb-reg-tab {
+  flex: 1; padding: 8px 12px; border: 1px solid var(--border); background: transparent;
+  border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-2);
+  transition: all .15s;
+}
+.rb-reg-tab.active { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+
+.rb-code-row { display: flex; gap: 8px; }
+.rb-code-row input { flex: 1; }
+.rb-code-row button { white-space: nowrap; }
+
+.rb-mock-hint {
+  background: #fff9e6; border: 1px dashed #e6b800; border-radius: 6px;
+  padding: 8px 12px; font-size: 12px; color: #6b4e00; margin-bottom: 12px;
+}
+
+.rb-strength-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.rb-strength-fill {
+  height: 4px; flex: 1; border-radius: 2px; background: var(--border);
+  transition: width .2s, background .2s;
+}
+.rb-strength-fill.s0 { background: #e74c3c; width: 10%; }
+.rb-strength-fill.s1 { background: #e67e22; width: 30%; }
+.rb-strength-fill.s2 { background: #f1c40f; width: 55%; }
+.rb-strength-fill.s3 { background: #27ae60; width: 80%; }
+.rb-strength-fill.s4 { background: #2ecc71; width: 100%; }
+.rb-strength-bar span { font-size: 11px; color: var(--text-3); min-width: 50px; }
+
+.rb-match-hint { font-size: 12px; min-height: 16px; margin-bottom: 10px; }
+.rb-match-hint.ok { color: var(--success); }
+.rb-match-hint.err { color: var(--danger); }
+
+.rb-face-area { margin: 14px 0; }
+.rb-face-area > label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 8px; font-weight: 600; }
+.rb-face-container {
+  border: 1px dashed var(--border); border-radius: 8px; padding: 14px;
+  background: var(--bg); text-align: center; margin-bottom: 10px;
+  min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.rb-face-placeholder { color: var(--text-3); font-size: 13px; line-height: 1.8; }
+.rb-face-taken { color: var(--success); font-size: 14px; font-weight: 600; }
+.rb-face-area video, .rb-face-area canvas { margin: 0 auto; }
+
+.rb-reg-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.rb-reg-nav button { flex: 1; }
+
+.rb-agree { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.rb-agree input { margin-top: 2px; }
+
+.rb-success-icon { font-size: 56px; margin-bottom: 12px; }

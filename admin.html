@@ -67,6 +67,29 @@
       .admin-sidebar { position: relative; height: auto; }
       .admin-topbar { left: 0; }
     }
+
+    /* Code Manager Tabs */
+    .code-tab { flex: 1; padding: 14px 16px; background: transparent; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; font-weight: 600; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .code-tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.02); }
+    .code-tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); background: rgba(0,240,255,0.05); }
+    .code-tab-pane { padding-top: 0; }
+    .tpl-card { background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); border-radius: 10px; padding: 14px 16px; transition: all 0.2s; }
+    .tpl-card:hover { border-color: rgba(0,240,255,0.4); }
+    .tpl-card .tpl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .tpl-card .tpl-name { font-weight: 700; font-size: 14px; }
+    .tpl-card .tpl-lang { padding: 2px 10px; border-radius: 100px; font-size: 10px; font-weight: 700; }
+    .tpl-card .tpl-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .tpl-card pre { background: rgba(0,0,0,0.4); padding: 10px 12px; border-radius: 6px; font-family: Consolas,monospace; font-size: 11px; color: var(--accent-cyan); max-height: 100px; overflow: hidden; white-space: pre-wrap; }
+    .tpl-card .tpl-ops { margin-top: 10px; display: flex; gap: 8px; }
+    .badge-lang-powershell { background: rgba(0,128,0,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+    .badge-lang-python { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .badge-lang-javascript { background: rgba(234,179,8,0.15); color: #facc15; border: 1px solid rgba(234,179,8,0.3); }
+    .badge-lang-sql { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-lang-bash { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+    .file-item { padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.03); display: flex; align-items: center; gap: 8px; transition: all 0.15s; }
+    .file-item:hover { background: rgba(0,240,255,0.08); color: var(--accent-cyan); }
+    .file-item.dir { font-weight: 600; color: var(--accent-purple); }
+    .file-item.selected { background: rgba(0,240,255,0.15); color: var(--accent-cyan); }
   </style>
 </head>
 <body>
@@ -105,6 +128,7 @@
       <li><a href="#" data-view="users">👥 用户管理</a></li>
       <li><a href="#" data-view="pay">💰 支付管理</a></li>
       <li><a href="#" data-view="rail-codes">🔑 轨道激活码</a></li>
+      <li><a href="#" data-view="code">💻 代码管理</a></li>
       <li><a href="#" data-view="models">🧠 模型调用</a></li>
       <li><a href="index.html">↩️ 返回官网</a></li>
     </ul>
@@ -304,6 +328,143 @@
           </div>
         </div>
       </div>
+
+      <!-- Code Management -->
+      <div id="view-code" style="display:none;">
+        <!-- Tab nav -->
+        <div class="card" style="margin-bottom:20px;padding:0;overflow:hidden;">
+          <div style="display:flex;border-bottom:1px solid var(--border-glass);">
+            <button class="code-tab active" data-tab="templates" onclick="switchCodeTab('templates')">📚 代码模板库</button>
+            <button class="code-tab" data-tab="history" onclick="switchCodeTab('history')">🕐 生成历史</button>
+            <button class="code-tab" data-tab="exec" onclick="switchCodeTab('exec')">⚡ 在线执行</button>
+            <button class="code-tab" data-tab="files" onclick="switchCodeTab('files')">📁 文件浏览</button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Templates -->
+        <div class="code-tab-pane" id="code-tab-templates">
+          <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;margin-bottom:24px;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📚 全部模板</div>
+                <div style="display:flex;gap:10px;">
+                  <select id="tplLang" onchange="loadTemplates()" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+                    <option value="">全部语言</option>
+                  </select>
+                  <select id="tplCat" onchange="loadTemplates()" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+                    <option value="">全部分类</option>
+                  </select>
+                </div>
+              </div>
+              <div id="tplList" style="display:flex;flex-direction:column;gap:12px;">
+                <div style="color:var(--text-muted);padding:30px;text-align:center;">加载中...</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title" id="tplEditorTitle">➕ 新建模板</div>
+                <button onclick="closeTplEditor()" id="tplEditorClose" style="display:none;padding:4px 10px;background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border-glass);border-radius:6px;cursor:pointer;font-size:11px;">取消编辑</button>
+              </div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">名称</label>
+                <input type="text" id="tplName" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div class="form-group">
+                  <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">语言</label>
+                  <select id="tplLang2" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);">
+                    <option>python</option><option>powershell</option><option>javascript</option><option>sql</option><option>bash</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">分类</label>
+                  <input type="text" id="tplCat2" placeholder="入门/算法/工具..." style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">描述</label>
+                <input type="text" id="tplDesc" placeholder="模板作用简述" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+              </div>
+              <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">代码</label>
+                <textarea id="tplCode" rows="8" placeholder="# 在这里写代码..." style="width:100%;padding:12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--accent-cyan);font-family:monospace;font-size:12px;resize:vertical;"></textarea>
+              </div>
+              <button onclick="saveTemplate()" style="width:100%;padding:10px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;" id="tplSaveBtn">💾 保存模板</button>
+              <div id="tplResult" style="margin-top:10px;font-size:12px;"></div>
+              <input type="hidden" id="tplEditId">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: History -->
+        <div class="code-tab-pane" id="code-tab-history" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🕐 代码生成历史</div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <select id="histLang" onchange="loadHistory()" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;">
+                  <option value="">全部语言</option>
+                </select>
+                <input id="histSearch" oninput="loadHistory()" placeholder="🔍 prompt / id" style="padding:8px 12px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:12px;width:200px;">
+                <button onclick="clearAllHistory()" style="padding:8px 12px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#ef4444;cursor:pointer;font-size:12px;">🗑️ 清空</button>
+              </div>
+            </div>
+            <table>
+              <thead><tr>
+                <th style="width:40px;"><input type="checkbox" id="histSelectAll" onchange="toggleHistAll(this)"></th>
+                <th>ID</th><th>用户</th><th>语言</th><th>Prompt（前 500 字）</th><th>代码长度</th><th>时间</th><th>操作</th>
+              </tr></thead>
+              <tbody id="histTableBody"><tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">加载中...</td></tr></tbody>
+            </table>
+            <div id="histPager" style="margin-top:12px;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--text-muted);"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Sandbox Exec -->
+        <div class="code-tab-pane" id="code-tab-exec" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">⚡ 在线代码执行沙箱</div>
+              <div id="sbEnvInfo" style="font-size:11px;color:var(--text-muted);"></div>
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:12px;">
+              <select id="sbLang" onchange="updateSbExt()" style="padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-size:13px;">
+                <option value="powershell">PowerShell (系统自带)</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript (Node)</option>
+              </select>
+              <button onclick="loadTplToExec()" style="padding:10px 14px;background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-secondary);cursor:pointer;font-size:12px;">📚 从模板库加载</button>
+              <button onclick="execSandbox()" id="sbRunBtn" style="margin-left:auto;padding:10px 24px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;">▶ 运行</button>
+            </div>
+            <textarea id="sbCode" rows="10" spellcheck="false" style="width:100%;padding:12px;background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);border-radius:8px;color:#d1fae5;font-family:'Consolas','Courier New',monospace;font-size:13px;resize:vertical;tab-size:2;"></textarea>
+            <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">输出：</div>
+            <pre id="sbOutput" style="margin-top:6px;padding:14px;background:rgba(0,0,0,0.6);border:1px solid var(--border-glass);border-radius:8px;color:#fca5a5;font-family:'Consolas','Courier New',monospace;font-size:12px;max-height:260px;overflow:auto;white-space:pre-wrap;"></pre>
+          </div>
+        </div>
+
+        <!-- Tab 4: File Browser -->
+        <div class="code-tab-pane" id="code-tab-files" style="display:none;">
+          <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
+            <div class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:14px 18px;border-bottom:1px solid var(--border-glass);font-weight:700;font-size:13px;background:rgba(0,0,0,0.3);">📁 项目根目录</div>
+              <div id="fileTree" style="max-height:600px;overflow:auto;"></div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title" id="fileTitle">选择左侧文件</div>
+                <div id="fileMeta" style="font-size:11px;color:var(--text-muted);"></div>
+              </div>
+              <textarea id="fileContent" rows="18" spellcheck="false" style="width:100%;padding:12px;background:rgba(0,0,0,0.4);border:1px solid var(--border-glass);border-radius:8px;color:#e5e7eb;font-family:'Consolas','Courier New',monospace;font-size:12px;resize:vertical;"></textarea>
+              <div id="fileInfo" style="margin-top:10px;font-size:11px;color:var(--text-muted);"></div>
+              <div style="margin-top:12px;display:flex;gap:10px;">
+                <button onclick="saveFile()" id="fileSaveBtn" style="padding:10px 24px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;">💾 保存（热更新）</button>
+                <span style="color:#ef4444;font-size:11px;align-self:center;">⚠ 禁止写入 data/ 和 .git/</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -483,13 +644,14 @@
       document.querySelectorAll('.admin-nav a').forEach(x => x.classList.remove('active'));
       a.classList.add('active');
       const v = a.dataset.view;
-      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', 'rail-codes':'🔑 轨道激活码', models:'🧠 模型调用'}[v];
-      ['overview','users','pay','rail-codes','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
+      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', 'rail-codes':'🔑 轨道激活码', code:'💻 代码管理', models:'🧠 模型调用'}[v];
+      ['overview','users','pay','rail-codes','code','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
       document.getElementById('view-'+v).style.display = '';
       if (v === 'users') loadUsers();
       if (v === 'overview') loadOverview();
       if (v === 'pay') loadPay();
       if (v === 'rail-codes') loadRailCodes();
+      if (v === 'code') initCodeView();
     };
   });
 
@@ -595,6 +757,320 @@
     t.textContent = msg; t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;';
     document.body.appendChild(t); setTimeout(() => t.remove(), 2000);
   }
+
+  // ========== Code Management Module ==========
+  let codeCurrentTab = 'templates';
+  let tplEditId = null;
+  let histPage = 1;
+  let histSelected = new Set();
+  let currentFilePath = null;
+
+  function switchCodeTab(tab) {
+    codeCurrentTab = tab;
+    document.querySelectorAll('.code-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    ['templates','history','exec','files'].forEach(t => {
+      const el = document.getElementById('code-tab-' + t);
+      if (el) el.style.display = (t === tab) ? '' : 'none';
+    });
+    // lazy load
+    if (tab === 'templates') loadTemplates();
+    if (tab === 'history') loadHistory();
+    if (tab === 'exec') initSandboxTab();
+    if (tab === 'files') loadFileTree('');
+  }
+  window.switchCodeTab = switchCodeTab;
+
+  function initCodeView() { switchCodeTab('templates'); }
+
+  // ---- Templates ----
+  async function loadTemplates() {
+    const url = '/api/admin/code/templates';
+    const data = await api(url);
+    // populate filter selects only once
+    const tplLang = document.getElementById('tplLang');
+    if (tplLang.options.length <= 1) {
+      data.languages.forEach(l => tplLang.insertAdjacentHTML('beforeend', `<option value="${l}">${l}</option>`));
+    }
+    let list = data.templates;
+    const fLang = tplLang.value;
+    const fCat = document.getElementById('tplCat').value;
+    if (fLang) list = list.filter(t => t.language === fLang);
+    if (fCat) list = list.filter(t => t.category === fCat);
+    // also populate category select once
+    const tplCat = document.getElementById('tplCat');
+    if (tplCat.options.length <= 1 && data.categories) {
+      data.categories.forEach(c => tplCat.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`));
+    }
+    const container = document.getElementById('tplList');
+    if (list.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-muted);padding:40px;text-align:center;">暂无模板 — 右侧面板新建一个</div>';
+      return;
+    }
+    const langBadge = (l) => `<span class="tpl-lang badge-lang-${l||'bash'}">${l||'?'}</span>`;
+    container.innerHTML = list.map(t => `
+      <div class="tpl-card">
+        <div class="tpl-head">
+          <div class="tpl-name">${t.name} ${langBadge(t.language)}</div>
+          <div class="tpl-ops">
+            <button onclick="editTemplate('${t.id}')" style="padding:3px 10px;background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.3);border-radius:6px;color:var(--accent-cyan);cursor:pointer;font-size:11px;">编辑</button>
+            <button onclick="deleteTemplate('${t.id}')" style="padding:3px 10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:#ef4444;cursor:pointer;font-size:11px;">删除</button>
+          </div>
+        </div>
+        <div class="tpl-desc">${t.description||''} · <span style="color:var(--text-muted);">${t.category||'-'}</span></div>
+        <pre>${t.code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        <div class="tpl-ops">
+          <button onclick="useTplInExec('${t.id}')" style="padding:3px 10px;background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);border-radius:6px;color:#4ade80;cursor:pointer;font-size:11px;">▶ 载入沙箱</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  window.loadTemplates = loadTemplates;
+
+  async function saveTemplate() {
+    const id = document.getElementById('tplEditId').value;
+    const name = document.getElementById('tplName').value.trim();
+    const language = document.getElementById('tplLang2').value;
+    const description = document.getElementById('tplDesc').value.trim();
+    const category = document.getElementById('tplCat2').value.trim() || '未分类';
+    const code = document.getElementById('tplCode').value;
+    const r = document.getElementById('tplResult');
+    if (!name || !code) { r.style.color='#ef4444'; r.textContent='名称和代码必填'; return; }
+    try {
+      let res;
+      if (id) {
+        res = await api('/api/admin/code/templates/' + id, 'PUT', { name, language, description, category, code });
+        r.style.color='#4ade80'; r.textContent='✓ 已更新';
+      } else {
+        res = await api('/api/admin/code/templates', 'POST', { name, language, description, category, code });
+        r.style.color='#4ade80'; r.textContent='✓ 已创建';
+      }
+      resetTplEditor();
+      loadTemplates();
+    } catch(e) { r.style.color='#ef4444'; r.textContent='保存失败'; }
+  }
+  window.saveTemplate = saveTemplate;
+
+  async function editTemplate(id) {
+    try {
+      const t = await api('/api/admin/code/templates/' + id);
+      document.getElementById('tplEditId').value = t.id;
+      document.getElementById('tplName').value = t.name;
+      document.getElementById('tplLang2').value = t.language;
+      document.getElementById('tplDesc').value = t.description || '';
+      document.getElementById('tplCat2').value = t.category || '';
+      document.getElementById('tplCode').value = t.code;
+      document.getElementById('tplEditorTitle').textContent = '✏️ 编辑模板';
+      document.getElementById('tplEditorClose').style.display = '';
+      document.getElementById('tplSaveBtn').textContent = '💾 更新模板';
+      tplEditId = id;
+    } catch(e) { toastAdmin('加载模板失败'); }
+  }
+  window.editTemplate = editTemplate;
+
+  function resetTplEditor() {
+    document.getElementById('tplEditId').value = '';
+    document.getElementById('tplName').value = '';
+    document.getElementById('tplDesc').value = '';
+    document.getElementById('tplCat2').value = '';
+    document.getElementById('tplCode').value = '';
+    document.getElementById('tplEditorTitle').textContent = '➕ 新建模板';
+    document.getElementById('tplEditorClose').style.display = 'none';
+    document.getElementById('tplSaveBtn').textContent = '💾 保存模板';
+    document.getElementById('tplResult').textContent = '';
+  }
+  window.closeTplEditor = function() { resetTplEditor(); };
+
+  async function deleteTemplate(id) {
+    if (!confirm('确定删除此模板？')) return;
+    await api('/api/admin/code/templates/' + id, 'DELETE');
+    toastAdmin('✓ 已删除模板');
+    loadTemplates();
+  }
+  window.deleteTemplate = deleteTemplate;
+
+  // ---- History ----
+  async function loadHistory() {
+    const langSel = document.getElementById('histLang');
+    if (langSel.options.length <= 1) {
+      const init = await api('/api/admin/code/history?size=1');
+      (init.languages || []).forEach(l => langSel.insertAdjacentHTML('beforeend', `<option value="${l}">${l}</option>`));
+    }
+    const params = new URLSearchParams({ page: histPage, size: 20 });
+    const lang = langSel.value;
+    const q = document.getElementById('histSearch').value.trim();
+    if (lang) params.set('language', lang);
+    if (q) params.set('q', q);
+    const data = await api('/api/admin/code/history?' + params.toString());
+    const tbody = document.getElementById('histTableBody');
+    if (!data.history || data.history.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px;">暂无记录</td></tr>';
+      document.getElementById('histPager').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = data.history.map(h => {
+      const sel = histSelected.has(h.id);
+      return `<tr>
+        <td><input type="checkbox" class="hist-chk" value="${h.id}" ${sel?'checked':''} onchange="toggleHist('${h.id}',this)"></td>
+        <td style="font-family:monospace;font-size:11px;color:var(--accent-cyan);">${h.id}</td>
+        <td><strong>${h.user}</strong></td>
+        <td><span class="tpl-lang badge-lang-${h.language||'bash'}">${h.language||'?'}</span></td>
+        <td style="font-size:12px;color:var(--text-secondary);">${h.prompt.replace(/</g,'&lt;')}</td>
+        <td style="font-family:monospace;font-size:12px;">${h.code_len} chars</td>
+        <td style="font-size:11px;color:var(--text-muted);font-family:monospace;">${(h.created_at||'').slice(0,19).replace('T',' ')}</td>
+        <td><button onclick="deleteHistory('${h.id}')" style="padding:3px 10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;color:#ef4444;cursor:pointer;font-size:11px;">删</button></td>
+      </tr>`;
+    }).join('');
+    // pager
+    const tp = Math.max(1, Math.ceil(data.total / data.page_size));
+    document.getElementById('histPager').innerHTML =
+      `共 ${data.total} 条 · ${histPage}/${tp} 页` +
+      `<button onclick="histPage=${Math.max(1,histPage-1)};loadHistory()" ${histPage<=1?'disabled':''} style="margin-left:12px;padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:11px;">上一页</button>` +
+      `<button onclick="histPage=${Math.min(tp,histPage+1)};loadHistory()" ${histPage>=tp?'disabled':''} style="padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:11px;">下一页</button>`;
+  }
+  window.loadHistory = function() { histPage = 1; loadHistory(); };
+  // override oninput to reset page
+  document.addEventListener('DOMContentLoaded', () => {
+    const s = document.getElementById('histSearch');
+    if (s) s.addEventListener('input', () => { histPage = 1; loadHistory(); });
+    const l = document.getElementById('histLang');
+    if (l) l.addEventListener('change', () => { histPage = 1; loadHistory(); });
+  });
+
+  async function deleteHistory(id) {
+    if (!confirm('删除这条历史？')) return;
+    await api('/api/admin/code/history/' + id, 'DELETE');
+    toastAdmin('✓ 已删除');
+    loadHistory();
+  }
+  window.deleteHistory = deleteHistory;
+
+  function toggleHist(id, el) { if (el.checked) histSelected.add(id); else histSelected.delete(id); }
+  window.toggleHist = toggleHist;
+  function toggleHistAll(el) {
+    document.querySelectorAll('.hist-chk').forEach(c => { c.checked = el.checked; toggleHist(c.value, c); });
+  }
+  window.toggleHistAll = toggleHistAll;
+  async function clearAllHistory() {
+    if (!confirm('确定清空全部代码生成历史？此操作不可撤销')) return;
+    const data = await api('/api/admin/code/history?size=1000');
+    const ids = (data.history || []).map(h => h.id);
+    if (ids.length === 0) { toastAdmin('已为空'); return; }
+    await api('/api/admin/code/history/bulk-delete', 'POST', { ids });
+    toastAdmin('✓ 已清空');
+    histSelected.clear();
+    loadHistory();
+  }
+  window.clearAllHistory = clearAllHistory;
+
+  // ---- Sandbox Exec ----
+  async function initSandboxTab() {
+    if (sandboxInited) return;
+    sandboxInited = true;
+    document.getElementById('sbCode').value = "Write-Host 'Hello ZhiBei! Get-Date'";
+    document.getElementById('sbEnvInfo').textContent = '⚠ 沙箱受 PowerShell TCP 进程限制，仅支持内联 PowerShell 片段；Python/Node 需安装对应运行时';
+    document.getElementById('sbOutput').textContent = '(在 Windows Server 模式下，沙箱执行通过临时文件调用。PowerShell 5 已内置支持)';
+  }
+
+  async function execSandbox() {
+    const lang = document.getElementById('sbLang').value;
+    const code = document.getElementById('sbCode').value;
+    const out = document.getElementById('sbOutput');
+    const btn = document.getElementById('sbRunBtn');
+    if (!code.trim()) { out.textContent = '(空代码)'; return; }
+    btn.textContent = '⏳ 运行中...'; btn.disabled = true;
+    out.textContent = '';
+    try {
+      const r = await api('/api/admin/code/exec', 'POST', { language: lang, code: code });
+      const exitBadge = r.exit_code === 0 ? '[OK]' : (r.exit_code < 0 ? '[ERR]' : '[FAIL]');
+      out.textContent = `${exitBadge} exit_code=${r.exit_code} · ${r.elapsed_ms}ms\n\n--- STDOUT ---\n${r.stdout||'(空)'}\n${r.stderr ? '\n--- STDERR ---\n' + r.stderr : ''}`;
+    } catch(e) {
+      out.textContent = '执行失败: ' + (e.message || '');
+    } finally {
+      btn.textContent = '▶ 运行'; btn.disabled = false;
+    }
+  }
+  window.execSandbox = execSandbox;
+
+  function updateSbExt() { /* placeholder */ }
+  window.updateSbExt = updateSbExt;
+
+  async function useTplInExec(id) {
+    try {
+      const t = await api('/api/admin/code/templates/' + id);
+      document.getElementById('sbLang').value = t.language;
+      document.getElementById('sbCode').value = t.code;
+      switchCodeTab('exec');
+    } catch(e) { toastAdmin('加载模板失败'); }
+  }
+  window.useTplInExec = useTplInExec;
+  async function loadTplToExec() {
+    try {
+      const data = await api('/api/admin/code/templates');
+      const choice = prompt('输入模板序号加载:\n' + data.templates.map((t,i)=>`${i+1}. ${t.name} [${t.language}]`).join('\n'));
+      if (!choice) return;
+      const idx = parseInt(choice) - 1;
+      const t = data.templates[idx];
+      if (!t) { toastAdmin('序号无效'); return; }
+      document.getElementById('sbLang').value = t.language;
+      document.getElementById('sbCode').value = t.code;
+      toastAdmin('✓ 已加载: ' + t.name);
+    } catch(e) { toastAdmin('加载失败'); }
+  }
+  window.loadTplToExec = loadTplToExec;
+
+  // ---- File Browser ----
+  async function loadFileTree(path) {
+    try {
+      const url = '/api/admin/code/files' + (path ? '?path=' + encodeURIComponent(path) : '');
+      const d = await api(url);
+      const container = document.getElementById('fileTree');
+      if (!d.is_dir) { container.innerHTML = '<div style="padding:30px;color:var(--text-muted);text-align:center;">这是文件不是目录</div>'; return; }
+      let html = '';
+      if (d.path !== '/' && d.parent) {
+        html += `<div class="file-item dir" onclick="loadFileTree('${d.parent.replace(/\\/g,'/')}')">⬅️ .. 返回上级</div>`;
+      }
+      html += `<div style="padding:6px 14px;color:var(--text-muted);font-size:11px;border-bottom:1px solid var(--border-glass);font-family:monospace;">${d.path}</div>`;
+      const dirs = d.items.filter(i => i.is_dir).sort((a,b) => a.name.localeCompare(b.name));
+      const files = d.items.filter(i => !i.is_dir).sort((a,b) => a.name.localeCompare(b.name));
+      dirs.forEach(i => {
+        const relPath = (path ? path + '/' : '') + i.name;
+        html += `<div class="file-item dir" onclick="loadFileTree('${relPath}')">📁 ${i.name}</div>`;
+      });
+      files.forEach(i => {
+        const relPath = (path ? path + '/' : '') + i.name;
+        const sizeStr = i.size !== null ? (i.size > 1024 ? (i.size/1024).toFixed(1) + 'KB' : i.size + 'B') : '';
+        html += `<div class="file-item" data-path="${relPath}" onclick="openFile('${relPath}',this)">📄 ${i.name}<span style="margin-left:auto;color:var(--text-muted);font-size:10px;">${sizeStr}</span></div>`;
+      });
+      if (d.items.length === 0) html += '<div style="padding:30px;color:var(--text-muted);text-align:center;">空目录</div>';
+      container.innerHTML = html;
+    } catch(e) { document.getElementById('fileTree').innerHTML = '<div style="padding:30px;color:#ef4444;">加载失败</div>'; }
+  }
+  window.loadFileTree = loadFileTree;
+
+  async function openFile(relPath, el) {
+    document.querySelectorAll('.file-item.selected').forEach(x => x.classList.remove('selected'));
+    if (el) el.classList.add('selected');
+    try {
+      const d = await api('/api/admin/code/files?path=' + encodeURIComponent(relPath));
+      if (d.is_dir) { loadFileTree(relPath); return; }
+      currentFilePath = relPath;
+      document.getElementById('fileTitle').textContent = d.name;
+      document.getElementById('fileContent').value = d.content;
+      document.getElementById('fileMeta').textContent = `.${d.ext} · ${d.size} bytes · ${d.lines} 行`;
+      document.getElementById('fileInfo').textContent = '路径: ' + relPath;
+    } catch(e) { toastAdmin('读取文件失败'); }
+  }
+  window.openFile = openFile;
+
+  async function saveFile() {
+    if (!currentFilePath) { toastAdmin('请先打开一个文件'); return; }
+    const content = document.getElementById('fileContent').value;
+    try {
+      const r = await api('/api/admin/code/save', 'POST', { path: currentFilePath, content });
+      toastAdmin('✓ 已保存 · ' + r.size + ' chars');
+    } catch(e) { toastAdmin('保存失败: ' + (e.message || '')); }
+  }
+  window.saveFile = saveFile;
 })();
 </script>
 </body>
