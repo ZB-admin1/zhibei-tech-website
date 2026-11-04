@@ -35,6 +35,13 @@ def clean_md(s):
     s = re.sub(r"`([^`]+)`", r"\1", s)
     return s.strip()
 
+def strip_section_label(s):
+    """专门用于解说句：清除行首小标题标签
+    例: '技术特点：以瑞典...' → '以瑞典...'"""
+    s = clean_md(s)
+    s = re.sub(r"^[^\s]{2,8}[：:]\s*", "", s)
+    return s.strip()
+
 # 要跳过的表头词（只在表格第一行出现，不应作为要点）
 HEADER_KEYS = {
     "阶段", "代表车型", "最高速度", "年代", "技术来源",
@@ -132,16 +139,106 @@ def split_sections(md):
         sections.append((cur_title, "\n".join(cur_body).strip()))
     return sections
 
+def extract_narration_sentences(md, max_sents=4):
+    """从非表格段落中提取有信息量的解说句（用于视频口播）
+    排除表格行、列表标记、过长/过短/纯小标题"""
+    sents = []
+    secs = split_sections(md)
+    for sec_title, body in secs:
+        for ln in body.split("\n"):
+            ln = ln.strip()
+            if not ln:
+                continue
+            # 跳过表格行
+            if ln.startswith("|") or all(set(c) <= {"-", ":", "|"} for c in ln):
+                continue
+            # 跳过纯列表标记/纯小标题
+            ln = ln.strip("-*").strip()
+            if len(ln) < 8:
+                continue
+            if len(ln) > 120:  # 太长的句子截断
+                ln = ln[:115] + "…"
+            # 用 strip_section_label 清理（去小标题前缀 + markdown）
+            ln_clean = strip_section_label(ln)
+            if ln_clean in BOLD_BLACKLIST:
+                continue
+            # 排除纯参数行（label: value 格式）
+            if re.match(r"^[\u4e00-\u9fa5A-Za-z]+[：:]\s*[\d]", ln_clean):
+                continue
+            # 排除纯列表罗列（逗号/顿号超过 4 个 = 站名/清单）
+            punct_count = ln_clean.count("、") + ln_clean.count("，") + ln_clean.count(",")
+            if punct_count > 4:
+                continue
+            # 排除纯数字开头（"81.5%..."、"2017 年..." 这种）
+            if re.match(r"^[\d\.]+\s*[%年公里km]", ln_clean):
+                continue
+            sents.append(ln_clean)
+    # 去重
+    seen = set()
+    out = []
+    for s in sents:
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out[:max_sents]
+
+def _keyword_to_spoken(kw):
+    """把 'label：value' 格式的知识点变成口播体
+    例: '最高设计速度：250 km/h' -> '最高设计速度达到 250 km/h'"""
+    if "：" in kw:
+        label, value = kw.split("：", 1)
+        value = value.strip()
+        # label -> 不同口播前缀（避免 value 开头的重复词）
+        spoken_prefixes = {
+            "最高设计速度": "最高设计速度达到",
+            "设计速度": "设计速度为",
+            "最高运营速度": "最高运营速度可达",
+            "最高试验速度": "最高试验速度创下",
+            "试验速度": "试验速度达到",
+            "编组": "采用的编组方式是",
+            "定员": "最大定员人数为",
+            "车长": "车身总长度",
+            "车宽": "车身宽度为",
+            "车高": "车身高度为",
+            "轴重": "轴重控制在",
+            "牵引功率": "牵引功率达到",
+            "生产厂商": "由",
+            "投产": "投产于",
+            "产量": "累计产量达到",
+            "线路全长": "线路全长达到",
+            "运营时间": "正式投入运营是在",
+            "全程时间": "全程最快只需",
+            "年客流量": "年客流量超过",
+            "总投资": "项目总投资约",
+        }
+        prefix = spoken_prefixes.get(label, label + "是")
+        # 避免重复词：只要 prefix 里已包含 value 开头的词就切掉
+        # "全程最快只需" + "最快 4h 18min" → "全程最快只需 4h 18min"
+        # "年客流量超过" + "超 2 亿人次" → "年客流量超过 2 亿人次"
+        # "项目总投资约" + "约 2209 亿元" → "项目总投资约 2209 亿元"
+        if "最快" in prefix and value.startswith("最快"):
+            value = value[2:].strip()
+        elif "超过" in prefix and value.startswith("超"):
+            value = value[1:].strip()
+        elif "约" in prefix and value.startswith("约"):
+            value = value[1:].strip()
+        return f"{prefix} {value}"
+    return kw
+
 def build_subtitle_lines(lesson, unit_name, part_name):
-    """把 lesson 转成视频字幕要点（6-8 行真实内容）"""
+    """生成视频字幕：标题 + 参数要点 + 解说金句 + 引导"""
     title = lesson["title"]
     md = lesson.get("doc_markdown", "")
-    kws = extract_keywords(md, max_kw=6)
+    kws = extract_keywords(md, max_kw=5)
+    narrations = extract_narration_sentences(md, max_sents=2)
 
     lines = []
     lines.append(f"📌 {title} — 本节核心知识点")
-    for kw in kws[:5]:
+    for kw in kws[:4]:
         lines.append(f"• {clean_md(kw)}")
+    # 穿插一条解说金句
+    if narrations:
+        lines.append(f"💬 {narrations[0]}")
     hints = [
         "💡 建议先完整看完，再对照文档做笔记",
         "💡 关键参数可以暂停截图保存",
@@ -152,37 +249,47 @@ def build_subtitle_lines(lesson, unit_name, part_name):
     return lines[:8]
 
 def build_script_lines(lesson, unit_no, part_no, lesson_no, unit_name, part_name):
-    """生成视频的完整解说脚本"""
+    """生成视频的完整口播解说脚本
+    结构：开场欢迎 → 主题引入 → 参数讲解 → 亮点解说 → 总结"""
     title = lesson["title"]
     md = lesson.get("doc_markdown", "")
     kws = extract_keywords(md, max_kw=5)
+    narrations = extract_narration_sentences(md, max_sents=3)
 
     s = []
-    s.append(f"【开场】欢迎来到第{unit_no}单元·第{part_no}部分·第{lesson_no}讲")
-    s.append(f"【主题】{title}")
-    for i, kw in enumerate(kws[:5], 1):
-        s.append(f"【要点{i}】{kw}")
-    if not kws:
-        # 没有参数表格时，取前两段落首句
-        secs = split_sections(md)
-        content_lines = []
-        for _, body in secs[:3]:
-            for ln in body.split("\n"):
-                ln = ln.strip().strip("-*").strip()
-                if ln and len(ln) > 10 and not ln.startswith("|"):
-                    content_lines.append(ln)
-        for i, cl in enumerate(content_lines[:5], 1):
-            s.append(f"【要点{i}】{cl[:50]}")
-    s.append("【结语】以上就是本节课的核心内容")
+    # 开场
+    s.append("【开场】欢迎来到智北轨道科普课堂")
+    s.append(f"【引入】今天我们来讲第{unit_no}单元·{part_name}中的：{title}")
+
+    if kws:
+        # 用口播体逐个讲解参数
+        for i, kw in enumerate(kws[:5], 1):
+            spoken = _keyword_to_spoken(kw)
+            s.append(f"【讲解{i}】{spoken}")
+    else:
+        # 没有参数表格时，取解说段首句
+        if narrations:
+            for i, n in enumerate(narrations[:4], 1):
+                s.append(f"【讲解{i}】{n}")
+        else:
+            s.append("【讲解1】这是一节重要的轨道知识点课程")
+
+    # 亮点解说（从非表格段落）
+    if narrations and len(narrations) > 0:
+        s.append(f"【亮点】值得一提的是：{narrations[0]}")
+    if narrations and len(narrations) > 1:
+        s.append(f"【拓展】{narrations[1]}")
+
+    # 结语
+    s.append(f"【结语】好，以上就是《{title}》的核心知识点")
     return s
 
 def build_points(lesson):
-    """独立的知识点列表"""
+    """独立的知识点列表（保持原始格式用于前端对比展示）"""
     md = lesson.get("doc_markdown", "")
     kws = extract_keywords(md, max_kw=8)
     if kws:
         return kws
-    # fallback: 取段落首句
     secs = split_sections(md)
     pts = []
     for _, body in secs:
