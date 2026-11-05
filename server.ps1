@@ -28,6 +28,7 @@ $CODE_HIST_FILE= Join-Path $STORAGE_DIR "CODE_HISTORY.json"
 $RAIL_ORDERS_FILE = Join-Path $STORAGE_DIR "RAIL_ORDERS.json"
 $ZB_WALLET_FILE = Join-Path $STORAGE_DIR "ZB_WALLET.json"
 $RAIL_VIDEO_META_FILE = Join-Path $STORAGE_DIR "RAIL_VIDEO_META.json"
+$MOCK_WHITELIST_FILE = Join-Path $STORAGE_DIR "MOCK_WHITELIST.json"
 $SCRIPT_ROOT  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JWT_SECRET  = "zb-secret-2026-zhibei-tech-inner"
 $ADMIN_USER  = "admin"
@@ -39,6 +40,42 @@ $script:EMAIL_CODES = @{}   # same structure
 $script:bankRevealTokens = @{}   # 银行卡号查看临时 token（{user.sub = @{ token; expires; used } }）
 $script:bankRevealLastCall = @{} # 限流
 $script:CODE_RATE   = @{}   # @{ "192.168.1.1" = @{ last_send=[datetime]; count_per_day=0 } }
+$script:MOCK_WHITELIST = @()  # array of IP strings that can use MOCK SMS/Email
+
+function Save-MockWhitelist {
+    $script:MOCK_WHITELIST | ConvertTo-Json | Out-File -FilePath $MOCK_WHITELIST_FILE -Encoding utf8
+}
+function Load-MockWhitelist {
+    if (Test-Path $MOCK_WHITELIST_FILE) {
+        try {
+            $arr = (Get-Content $MOCK_WHITELIST_FILE -Raw | ConvertFrom-Json)
+            $script:MOCK_WHITELIST = @($arr)
+        } catch {
+            $script:MOCK_WHITELIST = @()
+        }
+    }
+}
+function Get-MyIPs {
+    <# 返回本机所有 IP（自动放行） #>
+    $ips = @("127.0.0.1", "::1")
+    try {
+        $netIPs = Get-NetIPAddress -AddressFamily IPv4 -EA SilentlyContinue | Where-Object { $_.IPAddress -notlike "127.*" -and $_.PrefixOrigin -ne "WellKnown" }
+        foreach ($n in $netIPs) { $ips += $n.IPAddress }
+    } catch {}
+    return $ips
+}
+function Test-MockAllowed([string]$ClientIP) {
+    <# 判断该 IP 是否允许使用 MOCK 验证码（本机自动 + 管理员授权） #>
+    if (-not $ClientIP) { return $false }
+    $localIPs = Get-MyIPs
+    foreach ($lip in $localIPs) {
+        if ($ClientIP -eq $lip) { return $true }
+    }
+    foreach ($w in $script:MOCK_WHITELIST) {
+        if ([string]$w -eq $ClientIP) { return $true }
+    }
+    return $false
+}
 
 function New-6DigitCode {
     $r = New-Object System.Random
@@ -897,7 +934,7 @@ function Invoke-CodeSandbox([string]$Language,[string]$Code,[int]$TimeoutSec=15)
 
 # -------- API Handler --------
 function Handle-API {
-    param([string]$Path,[string]$Method,[string]$Body,[string]$AuthHeader,[System.Net.Sockets.NetworkStream]$Stream)
+    param([string]$Path,[string]$Method,[string]$Body,[string]$AuthHeader,[System.Net.Sockets.NetworkStream]$Stream,[string]$ClientIP="")
 
     # Parse query string into $Query hashtable, strip from $Path for route matching
     $Query = @{}
@@ -932,6 +969,11 @@ function Handle-API {
     # --- Send SMS / Email verification codes (MOCK - code returned in response) ---
     if ($Path -eq "/api/send-sms-code" -and $Method -eq "POST") {
         try {
+            # MOCK whitelist check - only local machine + admin-approved IPs
+            if (-not (Test-MockAllowed -ClientIP $ClientIP)) {
+                Send-Error $Stream 403 "MOCK mode requires admin approval for IP $ClientIP; local machine auto-allowed"
+                return $true
+            }
             $req = $Body | ConvertFrom-Json
             $phone = [string]$req.phone
             if (-not (Test-PhoneCN $phone)) { Send-Error $Stream 400 "invalid phone number"; return $true }
@@ -946,6 +988,11 @@ function Handle-API {
     }
     if ($Path -eq "/api/send-email-code" -and $Method -eq "POST") {
         try {
+            # MOCK whitelist check
+            if (-not (Test-MockAllowed -ClientIP $ClientIP)) {
+                Send-Error $Stream 403 "MOCK mode requires admin approval for IP $ClientIP; local machine auto-allowed"
+                return $true
+            }
             $req = $Body | ConvertFrom-Json
             $email = [string]$req.email
             if (-not (Test-EmailCN $email)) { Send-Error $Stream 400 "invalid email"; return $true }
@@ -1829,6 +1876,49 @@ function Handle-API {
         return $true
     }
 
+    # --- Admin Mock Whitelist (SMS/Email MOCK authorization) ---
+    if ($Path -match "^/api/admin/mock-whitelist") {
+        if ($auth.role -ne "admin") { Send-Error $Stream 403 "admin only"; return $true }
+        if ($Path -eq "/api/admin/mock-whitelist" -and $Method -eq "GET") {
+            $myIPs = @(Get-MyIPs)
+            $enabledIPs = @($myIPs + $script:MOCK_WHITELIST | Select-Object -Unique)
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{
+                whitelist = @($script:MOCK_WHITELIST)
+                local_ips = $myIPs
+                enabled_ips = $enabledIPs
+                mock_enabled = $true
+                note = "MOCK SMS/Email requires client IP in local_ips OR admin whitelist. Local IPs auto-allowed."
+            }
+            return $true
+        }
+        if ($Path -match '^/api/admin/mock-whitelist/add$' -and $Method -eq "POST") {
+            $req = $Body | ConvertFrom-Json
+            $ip = [string]$req.ip
+            if (-not $ip) { Send-Error $Stream 400 "ip required"; return $true }
+            # Simple IP validation
+            if ($ip -notmatch '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
+                Send-Error $Stream 400 "invalid IP format"; return $true
+            }
+            if ($script:MOCK_WHITELIST -notcontains $ip) {
+                $script:MOCK_WHITELIST += $ip
+                Save-MockWhitelist
+            }
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ whitelist = @($script:MOCK_WHITELIST); added=$ip }
+            return $true
+        }
+        if ($Path -match '^/api/admin/mock-whitelist/remove$' -and $Method -eq "POST") {
+            $req = $Body | ConvertFrom-Json
+            $ip = [string]$req.ip
+            if (-not $ip) { Send-Error $Stream 400 "ip required"; return $true }
+            $script:MOCK_WHITELIST = @($script:MOCK_WHITELIST | Where-Object { $_ -ne $ip })
+            Save-MockWhitelist
+            Send-Json -Stream $Stream -StatusCode 200 -Data @{ whitelist = @($script:MOCK_WHITELIST); removed=$ip }
+            return $true
+        }
+        Send-Error $Stream 404 "mock-whitelist endpoint not found"
+        return $true
+    }
+
     # --- Admin Pay ---
     if ($Path -match "^/api/pay/admin" -and $payAuth.role -ne "admin") { Send-Error $Stream 403 "admin only"; return $true }
     if ($Path -eq "/api/pay/admin/all-orders") {
@@ -2394,6 +2484,12 @@ $tcp.Start()
 $localIP = "127.0.0.1"
 try { $ips = Get-NetIPAddress -AddressFamily IPv4 -EA SilentlyContinue | Where-Object { $_.IPAddress -notlike "127.*" -and $_.PrefixOrigin -ne "WellKnown" } | Select-Object -First 1; if ($ips) { $localIP = $ips.IPAddress } } catch {}
 
+# --- Init Mock Whitelist ---
+Load-MockWhitelist
+$myIPs = Get-MyIPs
+Write-Host "  MOCK Whitelist: $(if($script:MOCK_WHITELIST.Count -gt 0){$script:MOCK_WHITELIST -join ','}else{'(empty)'})" -ForegroundColor Magenta
+Write-Host "  MOCK Auto-allowed (local): $($myIPs -join ', ')" -ForegroundColor Magenta
+
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  ZhiBei Tech AI API Server v4 (ZBpay)" -ForegroundColor Cyan
@@ -2456,6 +2552,12 @@ try {
             foreach ($line in $lines) {
                 if ($line -match '^Authorization:\s*(.+)$') { $authHeader = $Matches[1].Trim() }
             }
+            # Extract client IP
+            $clientIP = ""
+            try { $clientIP = ($client.Client.RemoteEndPoint.ToString() -split ":")[0] } catch {}
+            foreach ($line in $lines) {
+                if ($line -match '^X-Forwarded-For:\s*(.+)$') { $xff = $Matches[1].Split(",")[0].Trim(); if ($xff) { $clientIP = $xff } }
+            }
             if ($method -eq "POST" -and $headerEndIdx -ge 0) {
                 $bodyStart = $headerEndIdx + 4
                 if ($bodyStart -lt $bytesRead) {
@@ -2466,7 +2568,7 @@ try {
             }
             $ts = Get-Date -Format "HH:mm:ss"
             if ($pathOnly -match "^/api/") {
-                $handled = Handle-API -Path $rawPath -Method $method -Body $body -AuthHeader $authHeader -Stream $stream
+                $handled = Handle-API -Path $rawPath -Method $method -Body $body -AuthHeader $authHeader -Stream $stream -ClientIP $clientIP
                 if ($handled) { Write-Host "  [$ts] API $method $pathOnly" -ForegroundColor DarkCyan }
                 else { Send-Error $stream 404 "endpoint not found"; Write-Host "  [$ts] API 404 $method $pathOnly" -ForegroundColor Red }
             } else {
