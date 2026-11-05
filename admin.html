@@ -128,6 +128,7 @@
       <li><a href="#" data-view="users">👥 用户管理</a></li>
       <li><a href="#" data-view="pay">💰 支付管理</a></li>
       <li><a href="#" data-view="rail-codes">🔑 轨道激活码</a></li>
+      <li><a href="#" data-view="mock">🛡️ 验证码白名单</a></li>
       <li><a href="#" data-view="code">💻 代码管理</a></li>
       <li><a href="#" data-view="models">🧠 模型调用</a></li>
       <li><a href="index.html">↩️ 返回官网</a></li>
@@ -325,6 +326,82 @@
               <button onclick="importRailCodes()" style="flex:1;padding:10px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;">📥 批量导入</button>
             </div>
             <div id="rcImportResult" style="margin-top:10px;font-size:12px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOCK Verification Whitelist -->
+      <div id="view-mock" style="display:none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">MOCK 模式</div>
+            <div class="value" style="color:#4ade80;">已启用</div>
+            <div class="sub">验证码接口返回 mock_code</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">本机自动放行 IP</div>
+            <div class="value" id="mockLocalCount" style="color:var(--accent-cyan);">0</div>
+            <div class="sub">localhost + 所有网卡 IPv4</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">管理员白名单</div>
+            <div class="value" id="mockWlCount" style="color:#fbbf24;">0</div>
+            <div class="sub">手动授权的外部 IP</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">MOCK 生效 IP 总数</div>
+            <div class="value" id="mockEnabledCount">0</div>
+            <div class="sub">本机 IP + 白名单 IP</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 360px;gap:24px;margin-bottom:24px;">
+          <!-- Left: IP lists -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 IP 权限明细</div>
+              <button onclick="loadMock()" style="padding:6px 14px;background:rgba(0,240,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,240,255,0.3);border-radius:6px;cursor:pointer;font-size:12px;">🔄 刷新</button>
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.1em;">🖥️ 本机 IP（自动放行，不可删除）</div>
+              <div id="mockLocalList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.1em;">✅ 管理员白名单（手动添加）</div>
+              <div id="mockWlList" style="display:flex;flex-direction:column;gap:8px;"></div>
+            </div>
+
+            <div>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.1em;">🚫 被拒绝示例</div>
+              <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px 16px;font-size:12px;color:#f87171;font-family:monospace;">
+                POST /api/send-sms-code → 403 Forbidden: MOCK mode requires admin approval for IP 1.2.3.4
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Add/Remove -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">➕ 管理白名单</div></div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">添加后该 IP 的设备可调用 /api/send-sms-code 和 /api/send-email-code 获取 MOCK 验证码。</div>
+
+            <div class="form-group" style="margin-bottom:12px;">
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">IP 地址</label>
+              <input type="text" id="mockNewIp" placeholder="192.168.1.100" style="width:100%;padding:10px;background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;color:var(--text-primary);font-family:monospace;">
+            </div>
+            <button onclick="addMockIP()" style="width:100%;padding:10px;background:var(--gradient-main);color:var(--bg-primary);border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-bottom:12px;">➕ 添加到白名单</button>
+            <div id="mockResult" style="font-size:12px;min-height:18px;"></div>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-glass);">
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">💡 使用说明</div>
+              <ul style="font-size:12px;color:var(--text-secondary);line-height:1.8;padding-left:18px;">
+                <li>本机（localhost + 所有网卡 IP）自动放行，无需添加</li>
+                <li>外部设备访问时，通过 <code style="color:var(--accent-cyan);background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">X-Forwarded-For</code> 或 <code style="color:var(--accent-cyan);background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">Client.RemoteEndPoint</code> 识别 IP</li>
+                <li>验证码接口返回 <code style="color:var(--accent-cyan);background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">mock_code</code> 字段，注册时直接使用</li>
+                <li>非白名单 IP 调用返回 403</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -644,13 +721,14 @@
       document.querySelectorAll('.admin-nav a').forEach(x => x.classList.remove('active'));
       a.classList.add('active');
       const v = a.dataset.view;
-      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', 'rail-codes':'🔑 轨道激活码', code:'💻 代码管理', models:'🧠 模型调用'}[v];
-      ['overview','users','pay','rail-codes','code','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
+      document.getElementById('viewTitle').textContent = {overview:'📊 数据概览', users:'👥 用户管理', pay:'💰 支付管理', 'rail-codes':'🔑 轨道激活码', mock:'🛡️ 验证码白名单', code:'💻 代码管理', models:'🧠 模型调用'}[v];
+      ['overview','users','pay','rail-codes','mock','code','models'].forEach(x => document.getElementById('view-'+x).style.display = 'none');
       document.getElementById('view-'+v).style.display = '';
       if (v === 'users') loadUsers();
       if (v === 'overview') loadOverview();
       if (v === 'pay') loadPay();
       if (v === 'rail-codes') loadRailCodes();
+      if (v === 'mock') loadMock();
       if (v === 'code') initCodeView();
     };
   });
@@ -668,6 +746,67 @@
 
   window.resetQuota = (u) => {
     api(`/api/admin/users/${u}/quota`, 'POST', { quota_tokens: 100000 }).then(() => loadUsers());
+  };
+
+  // --- MOCK Verification Whitelist ---
+  async function loadMock() {
+    try {
+      const d = await api('/api/admin/mock-whitelist');
+      // Stats
+      document.getElementById('mockLocalCount').textContent = d.local_ips?.length || 0;
+      document.getElementById('mockWlCount').textContent = d.whitelist?.length || 0;
+      document.getElementById('mockEnabledCount').textContent = d.enabled_ips?.length || 0;
+      // Local IPs - chips
+      const localBox = document.getElementById('mockLocalList');
+      localBox.innerHTML = (d.local_ips || []).map(ip => `
+        <span style="padding:4px 12px;background:rgba(0,240,255,0.1);border:1px solid rgba(0,240,255,0.3);border-radius:100px;font-family:monospace;font-size:12px;color:var(--accent-cyan);">
+          🖥️ ${ip}
+        </span>
+      `).join('') || '<span style="color:var(--text-muted);font-size:12px;">暂无本机 IP</span>';
+      // Whitelist IPs
+      const wlBox = document.getElementById('mockWlList');
+      if (!d.whitelist || d.whitelist.length === 0) {
+        wlBox.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;">暂无手动授权的 IP — 添加右侧白名单即可启用 MOCK 验证码接口</div>';
+      } else {
+        wlBox.innerHTML = d.whitelist.map(ip => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.2);border-radius:8px;">
+            <span style="font-family:monospace;font-size:13px;color:#fbbf24;">✅ ${ip}</span>
+            <button onclick="removeMockIP('${ip}')" style="padding:4px 10px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);border-radius:6px;cursor:pointer;font-size:11px;">删除</button>
+          </div>
+        `).join('');
+      }
+    } catch (e) {
+      document.getElementById('mockLocalList').innerHTML = '<span style="color:#f87171;font-size:12px;">加载失败</span>';
+    }
+  }
+  window.loadMock = loadMock;
+
+  window.addMockIP = async function() {
+    const input = document.getElementById('mockNewIp');
+    const ip = input.value.trim();
+    const result = document.getElementById('mockResult');
+    if (!ip) { result.textContent = '请输入 IP 地址'; result.style.color = '#f87171'; return; }
+    // Basic IPv4 validation
+    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+      result.textContent = 'IP 格式不对，例如 192.168.1.100'; result.style.color = '#f87171'; return;
+    }
+    try {
+      const d = await api('/api/admin/mock-whitelist/add', 'POST', { ip });
+      result.textContent = d.message || `✅ ${ip} 已添加`;
+      result.style.color = '#4ade80';
+      input.value = '';
+      loadMock();
+    } catch (e) {
+      result.textContent = '❌ 添加失败'; result.style.color = '#f87171';
+    }
+  };
+
+  window.removeMockIP = async function(ip) {
+    if (!confirm(`确定从白名单中删除 ${ip} ？`)) return;
+    try {
+      await api('/api/admin/mock-whitelist/remove', 'POST', { ip });
+      loadMock();
+    } catch (e) { alert('删除失败'); }
   };
 
   // --- Rail Activation Codes Admin ---
