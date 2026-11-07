@@ -360,16 +360,15 @@ $PAYEE_BANK = [pscustomobject]@{
     swift        = "ICBKCNBJ"
 }
 
-# 银行卡号掩码：前4 + **** + 后4（19位/16位通用）
+# 银行卡号掩码：只显示前 4 位，其余全 ****（任何人都看不到完整号）
 function Get-MaskedBank([string]$no) {
     if ([string]::IsNullOrWhiteSpace($no)) { return "" }
     $clean = ($no -replace '\s', '')
-    if ($clean.Length -le 8) { return $clean }
+    if ($clean.Length -le 4) { return $clean }
     $prefix = $clean.Substring(0, 4)
-    $suffix = $clean.Substring($clean.Length - 4, 4)
-    $maskLen = $clean.Length - 8
-    $mask = ('*' * [Math]::Min($maskLen, 8))
-    return "$prefix $mask $suffix"
+    $maskLen = $clean.Length - 4
+    $mask = ('*' * [Math]::Min($maskLen, 12))
+    return "$prefix $mask"
 }
 function Get-PayeeBankMasked {
     [pscustomobject]@{
@@ -2243,54 +2242,10 @@ if ($auth.sub -and $prog.user_prog.PSObject.Properties[$auth.sub]) { $myProg = $
             return $true
         }
 
-        # ========== 完整收款银行卡号（两步验证） ==========
-        # 步骤1: POST /api/rail/bank-reveal-token — 生成一次性 6 位验证码（3 分钟有效，1 次使用）
-        if ($Path -eq "/api/rail/bank-reveal-token" -and $Method -eq "POST") {
-            # 限流：同一用户 60 秒内只能发 1 次
-            $key = "bank_reveal_$($auth.sub)"
-            $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-            if ($script:bankRevealLastCall -and $script:bankRevealLastCall.ContainsKey($key) -and ($now - $script:bankRevealLastCall[$key] -lt 60)) {
-                Send-Error $Stream 429 "请 $((60 - ($now - $script:bankRevealLastCall[$key]))) 秒后再试"; return $true
-            }
-            if (-not $script:bankRevealLastCall) { $script:bankRevealLastCall = @{} }
-            $script:bankRevealLastCall[$key] = $now
-            # 生成 6 位 token
-            $token = ('{0:D6}' -f (Get-Random -Min 0 -Max 1000000))
-            $script:bankRevealTokens[$auth.sub] = @{ token=$token; expires=$now+180; used=$false }
-            Send-Json -Stream $Stream -StatusCode 200 -Data @{
-                message="请确认是本人操作，输入下方 6 位验证码后可查看完整卡号"
-                reveal_code=$token  # MOCK 模式直接返回
-                expire_in=180
-            }
-            return $true
-        }
-
-        # 步骤2: POST /api/rail/bank-card — 用 token 换完整卡号（1 次有效）
-        if ($Path -eq "/api/rail/bank-card" -and $Method -eq "POST") {
-            try {
-                $req = $Body | ConvertFrom-Json
-                $code = [string]$req.reveal_code
-                $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-                $entry = $null
-                if ($script:bankRevealTokens -and $script:bankRevealTokens.ContainsKey($auth.sub)) {
-                    $entry = $script:bankRevealTokens[$auth.sub]
-                }
-                if (-not $entry) { Send-Error $Stream 400 "请先获取验证码"; return $true }
-                if ($entry.used) { Send-Error $Stream 400 "验证码已使用，请重新获取"; return $true }
-                if ($now -gt $entry.expires) { Send-Error $Stream 400 "验证码已过期"; return $true }
-                if ($code -ne $entry.token) { Send-Error $Stream 400 "验证码错误"; return $true }
-                # 标记已使用
-                $entry.used = $true
-                # 返回完整号（仅这一次）
-                Send-Json -Stream $Stream -StatusCode 200 -Data @{
-                    bank_name    = $PAYEE_BANK.bank_name
-                    account_name = $PAYEE_BANK.account_name
-                    account_no   = $PAYEE_BANK.account_no  # 完整号，仅通过此接口暴露
-                    swift        = $PAYEE_BANK.swift
-                    message      = "完整卡号仅本次有效，请妥善保存"
-                }
-            } catch { Send-Error $Stream 400 "reveal failed: $($_.Exception.Message)" }
-            return $true
+        # ========== 完整收款银行卡号 —— 已禁用，任何人都无法查看 ==========
+        # 所有接口统一返回只含前 4 位的掩码，完整号仅存在于服务器私有配置中
+        if ($Path -eq "/api/rail/bank-reveal-token" -or $Path -eq "/api/rail/bank-card") {
+            Send-Error $Stream 403 "出于资金安全考虑，完整卡号不再通过接口暴露，请联系官方客服"; return $true
         }
 
         # ========== 激活码 Redeem（轨道科普解锁统一入口） ==========
